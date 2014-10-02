@@ -1,5 +1,3 @@
 *.pyc
 /Cargo.lock
-# A gyp quirk strips the leading slash from OUTDIR=$(OUT_DIR).
-/home/
 /target

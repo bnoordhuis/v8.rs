@@ -1,6 +1,6 @@
 ARCH := $(word 1, $(subst -, ,$(TARGET)))
 
-V8_FLAGS := OUTDIR=$(OUT_DIR) i18nsupport=off
+V8_FLAGS := OUTDIR="$(OUT_DIR)" i18nsupport=off
 
 ifeq (true,$(DEBUG))
 V8_FLAGS := $(V8_FLAGS) extrachecks=on

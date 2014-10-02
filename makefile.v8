@@ -282,12 +282,12 @@ $(BUILDS): $(OUTDIR)/Makefile.$$@
 	         BUILDTYPE=$(shell echo $(subst .,,$(suffix $@)) | \
 	                     python -c "print \
 	                     raw_input().replace('opt', '').capitalize()") \
-	         builddir="$(shell pwd)/$(OUTDIR)/$@"
+	         builddir="$(OUTDIR)/$@"
 
 native: $(OUTDIR)/Makefile.native
 	@$(MAKE) -C "$(OUTDIR)" -f Makefile.native \
 	         CXX="$(CXX)" LINK="$(LINK)" BUILDTYPE=Release \
-	         builddir="$(shell pwd)/$(OUTDIR)/$@"
+	         builddir="$(OUTDIR)/$@"
 
 $(ANDROID_ARCHES): $(addprefix $$@.,$(MODES))
 
