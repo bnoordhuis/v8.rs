@@ -1,0 +1,8 @@
+CXXFLAGS = -Wall -Wextra -I../../include -fno-exceptions -fno-rtti -fPIC \
+           -fvisibility=hidden
+
+$(OUT_DIR)/libglue.a: $(OUT_DIR)/api.o
+	$(AR) crs $@ $^
+
+$(OUT_DIR)/api.o: api.cc
+	$(CXX) $(CXXFLAGS) $< -c -o $@

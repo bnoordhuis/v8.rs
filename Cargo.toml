@@ -1,11 +1,11 @@
 [package]
 
-name = "v8-sys"
+name = "v8"
 version = "0.0.1"
 authors = ["Ben Noordhuis <info@bnoordhuis.nl>"]
 build = "make -f makefile.cargo"
 
 [lib]
 
-name = "v8-sys"
-path = "lib.rs"
+name = "v8"
+path = "lib/lib.rs"
