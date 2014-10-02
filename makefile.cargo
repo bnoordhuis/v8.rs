@@ -1,0 +1,22 @@
+ARCH := $(word 1, $(subst -, ,$(TARGET)))
+
+V8_FLAGS := OUTDIR=$(OUT_DIR) i18nsupport=off
+
+ifeq (true,$(DEBUG))
+V8_FLAGS := $(V8_FLAGS) extrachecks=on
+V8_MODE := debug
+else
+V8_MODE := release
+endif
+
+ifeq (i686,$(ARCH))
+V8_ARCH := ia32
+endif
+
+ifeq (x86_64,$(ARCH))
+V8_ARCH := x64
+endif
+
+.PHONY: all
+all:
+	$(MAKE) -f makefile.v8 -j $(NUM_JOBS) $(V8_ARCH).$(V8_MODE) $(V8_FLAGS)

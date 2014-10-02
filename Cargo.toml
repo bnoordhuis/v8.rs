@@ -3,3 +3,9 @@
 name = "v8-sys"
 version = "0.0.1"
 authors = ["Ben Noordhuis <info@bnoordhuis.nl>"]
+build = "make -f makefile.cargo"
+
+[lib]
+
+name = "v8-sys"
+path = "lib.rs"
