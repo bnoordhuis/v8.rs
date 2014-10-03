@@ -114,7 +114,7 @@ impl Drop for Isolate {
 }
 
 impl String {
-    pub fn NewFromUtf8(isolate: &Isolate, data: *const i8, typ: i32,
+    pub fn NewFromUtf8(isolate: &Isolate, data: *const u8, typ: i32,
                        length: i32) -> Local<String> {
         unsafe { String_NewFromUtf8(isolate, data, typ, length) }
     }
@@ -178,6 +178,196 @@ impl V8 {
     }
 }
 
+impl Value {
+    pub fn BooleanValue(&self) -> bool {
+        unsafe { Value_BooleanValue(self) }
+    }
+
+    pub fn Int32Value(&self) -> i32 {
+        unsafe { Value_Int32Value(self) }
+    }
+
+    pub fn IntegerValue(&self) -> i64 {
+        unsafe { Value_IntegerValue(self) }
+    }
+
+    pub fn IsArgumentsObject(&self) -> bool {
+        unsafe { Value_IsArgumentsObject(self) }
+    }
+
+    pub fn IsArray(&self) -> bool {
+        unsafe { Value_IsArray(self) }
+    }
+
+    pub fn IsArrayBuffer(&self) -> bool {
+        unsafe { Value_IsArrayBuffer(self) }
+    }
+
+    pub fn IsArrayBufferView(&self) -> bool {
+        unsafe { Value_IsArrayBufferView(self) }
+    }
+
+    pub fn IsBoolean(&self) -> bool {
+        unsafe { Value_IsBoolean(self) }
+    }
+
+    pub fn IsBooleanObject(&self) -> bool {
+        unsafe { Value_IsBooleanObject(self) }
+    }
+
+    pub fn IsDataView(&self) -> bool {
+        unsafe { Value_IsDataView(self) }
+    }
+
+    pub fn IsDate(&self) -> bool {
+        unsafe { Value_IsDate(self) }
+    }
+
+    pub fn IsExternal(&self) -> bool {
+        unsafe { Value_IsExternal(self) }
+    }
+
+    pub fn IsFalse(&self) -> bool {
+        unsafe { Value_IsFalse(self) }
+    }
+
+    pub fn IsFloat32Array(&self) -> bool {
+        unsafe { Value_IsFloat32Array(self) }
+    }
+
+    pub fn IsFloat64Array(&self) -> bool {
+        unsafe { Value_IsFloat64Array(self) }
+    }
+
+    pub fn IsFunction(&self) -> bool {
+        unsafe { Value_IsFunction(self) }
+    }
+
+    pub fn IsGeneratorFunction(&self) -> bool {
+        unsafe { Value_IsGeneratorFunction(self) }
+    }
+
+    pub fn IsGeneratorObject(&self) -> bool {
+        unsafe { Value_IsGeneratorObject(self) }
+    }
+
+    pub fn IsInt16Array(&self) -> bool {
+        unsafe { Value_IsInt16Array(self) }
+    }
+
+    pub fn IsInt32(&self) -> bool {
+        unsafe { Value_IsInt32(self) }
+    }
+
+    pub fn IsInt32Array(&self) -> bool {
+        unsafe { Value_IsInt32Array(self) }
+    }
+
+    pub fn IsInt8Array(&self) -> bool {
+        unsafe { Value_IsInt8Array(self) }
+    }
+
+    pub fn IsMap(&self) -> bool {
+        unsafe { Value_IsMap(self) }
+    }
+
+    pub fn IsName(&self) -> bool {
+        unsafe { Value_IsName(self) }
+    }
+
+    pub fn IsNativeError(&self) -> bool {
+        unsafe { Value_IsNativeError(self) }
+    }
+
+    pub fn IsNull(&self) -> bool {
+        unsafe { Value_IsNull(self) }
+    }
+
+    pub fn IsNumber(&self) -> bool {
+        unsafe { Value_IsNumber(self) }
+    }
+
+    pub fn IsNumberObject(&self) -> bool {
+        unsafe { Value_IsNumberObject(self) }
+    }
+
+    pub fn IsObject(&self) -> bool {
+        unsafe { Value_IsObject(self) }
+    }
+
+    pub fn IsPromise(&self) -> bool {
+        unsafe { Value_IsPromise(self) }
+    }
+
+    pub fn IsRegExp(&self) -> bool {
+        unsafe { Value_IsRegExp(self) }
+    }
+
+    pub fn IsSet(&self) -> bool {
+        unsafe { Value_IsSet(self) }
+    }
+
+    pub fn IsString(&self) -> bool {
+        unsafe { Value_IsString(self) }
+    }
+
+    pub fn IsStringObject(&self) -> bool {
+        unsafe { Value_IsStringObject(self) }
+    }
+
+    pub fn IsSymbol(&self) -> bool {
+        unsafe { Value_IsSymbol(self) }
+    }
+
+    pub fn IsSymbolObject(&self) -> bool {
+        unsafe { Value_IsSymbolObject(self) }
+    }
+
+    pub fn IsTrue(&self) -> bool {
+        unsafe { Value_IsTrue(self) }
+    }
+
+    pub fn IsTypedArray(&self) -> bool {
+        unsafe { Value_IsTypedArray(self) }
+    }
+
+    pub fn IsUint16Array(&self) -> bool {
+        unsafe { Value_IsUint16Array(self) }
+    }
+
+    pub fn IsUint32(&self) -> bool {
+        unsafe { Value_IsUint32(self) }
+    }
+
+    pub fn IsUint32Array(&self) -> bool {
+        unsafe { Value_IsUint32Array(self) }
+    }
+
+    pub fn IsUint8Array(&self) -> bool {
+        unsafe { Value_IsUint8Array(self) }
+    }
+
+    pub fn IsUint8ClampedArray(&self) -> bool {
+        unsafe { Value_IsUint8ClampedArray(self) }
+    }
+
+    pub fn IsUndefined(&self) -> bool {
+        unsafe { Value_IsUndefined(self) }
+    }
+
+    pub fn IsWeakMap(&self) -> bool {
+        unsafe { Value_IsWeakMap(self) }
+    }
+
+    pub fn IsWeakSet(&self) -> bool {
+        unsafe { Value_IsWeakSet(self) }
+    }
+
+    pub fn NumberValue(&self) -> f64 {
+        unsafe { Value_NumberValue(self) }
+    }
+}
+
 #[link(name="glue")]
 #[link(name="v8")]
 #[link(name="stdc++")]  // __gxx_personality_v0@@CXXABI_1.3
@@ -195,7 +385,7 @@ extern {
     fn Script_Compile(source: Local<String>,
                       origin: *const ScriptOrigin) -> Local<Script>;
     fn Script_Run(script: Local<Script>) -> Local<Value>;
-    fn String_NewFromUtf8(isolate: &Isolate, data: *const i8, typ: i32,
+    fn String_NewFromUtf8(isolate: &Isolate, data: *const u8, typ: i32,
                           length: i32) -> Local<String>;
     fn TryCatch_CanContinue(try_catch: &TryCatch) -> bool;
     fn TryCatch_Exception(try_catch: &TryCatch) -> Local<Value>;
@@ -208,4 +398,51 @@ extern {
                      closure: *const |&TryCatch|);
     fn V8_Dispose() -> bool;
     fn V8_Initialize() -> bool;
+    fn Value_BooleanValue(that: &Value) -> bool;
+    fn Value_Int32Value(that: &Value) -> i32;
+    fn Value_IntegerValue(that: &Value) -> i64;
+    fn Value_IsArgumentsObject(that: &Value) -> bool;
+    fn Value_IsArray(that: &Value) -> bool;
+    fn Value_IsArrayBuffer(that: &Value) -> bool;
+    fn Value_IsArrayBufferView(that: &Value) -> bool;
+    fn Value_IsBoolean(that: &Value) -> bool;
+    fn Value_IsBooleanObject(that: &Value) -> bool;
+    fn Value_IsDataView(that: &Value) -> bool;
+    fn Value_IsDate(that: &Value) -> bool;
+    fn Value_IsExternal(that: &Value) -> bool;
+    fn Value_IsFalse(that: &Value) -> bool;
+    fn Value_IsFloat32Array(that: &Value) -> bool;
+    fn Value_IsFloat64Array(that: &Value) -> bool;
+    fn Value_IsFunction(that: &Value) -> bool;
+    fn Value_IsGeneratorFunction(that: &Value) -> bool;
+    fn Value_IsGeneratorObject(that: &Value) -> bool;
+    fn Value_IsInt16Array(that: &Value) -> bool;
+    fn Value_IsInt32(that: &Value) -> bool;
+    fn Value_IsInt32Array(that: &Value) -> bool;
+    fn Value_IsInt8Array(that: &Value) -> bool;
+    fn Value_IsMap(that: &Value) -> bool;
+    fn Value_IsName(that: &Value) -> bool;
+    fn Value_IsNativeError(that: &Value) -> bool;
+    fn Value_IsNull(that: &Value) -> bool;
+    fn Value_IsNumber(that: &Value) -> bool;
+    fn Value_IsNumberObject(that: &Value) -> bool;
+    fn Value_IsObject(that: &Value) -> bool;
+    fn Value_IsPromise(that: &Value) -> bool;
+    fn Value_IsRegExp(that: &Value) -> bool;
+    fn Value_IsSet(that: &Value) -> bool;
+    fn Value_IsString(that: &Value) -> bool;
+    fn Value_IsStringObject(that: &Value) -> bool;
+    fn Value_IsSymbol(that: &Value) -> bool;
+    fn Value_IsSymbolObject(that: &Value) -> bool;
+    fn Value_IsTrue(that: &Value) -> bool;
+    fn Value_IsTypedArray(that: &Value) -> bool;
+    fn Value_IsUint16Array(that: &Value) -> bool;
+    fn Value_IsUint32(that: &Value) -> bool;
+    fn Value_IsUint32Array(that: &Value) -> bool;
+    fn Value_IsUint8Array(that: &Value) -> bool;
+    fn Value_IsUint8ClampedArray(that: &Value) -> bool;
+    fn Value_IsUndefined(that: &Value) -> bool;
+    fn Value_IsWeakMap(that: &Value) -> bool;
+    fn Value_IsWeakSet(that: &Value) -> bool;
+    fn Value_NumberValue(that: &Value) -> f64;
 }
