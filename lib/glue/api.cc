@@ -63,4 +63,22 @@ extern "C" v8::Local<v8::String> String_NewFromUtf8(
   return v8::String::NewFromUtf8(isolate, data, type, length);
 }
 
+extern "C" void TryCatch_With(void (*callback)(v8::TryCatch*, void*),
+                              void* arg) {
+  v8::TryCatch try_catch;
+  callback(&try_catch, arg);
+}
+
+#define V(clazz, method, type) \
+  extern "C" type clazz##_##method(v8::clazz* that) { return that->method(); }
+V(TryCatch, CanContinue, bool)
+V(TryCatch, Exception, v8::Local<v8::Value>)
+V(TryCatch, HasCaught, bool)
+V(TryCatch, HasTerminated, bool)
+V(TryCatch, Message, v8::Local<v8::Message>)
+V(TryCatch, ReThrow, v8::Local<v8::Value>)
+V(TryCatch, Reset, void)
+V(TryCatch, StackTrace, v8::Local<v8::Value>)
+#undef V
+
 }  // namespace anonymous

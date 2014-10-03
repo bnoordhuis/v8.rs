@@ -15,6 +15,7 @@ pub struct Local<T> {
 #[repr(C)] pub struct Script;
 #[repr(C)] pub struct ScriptOrigin;
 #[repr(C)] pub struct String;
+#[repr(C)] pub struct TryCatch;
 #[repr(C)] pub struct Value;
 #[repr(C)] pub struct V8;
 
@@ -37,11 +38,21 @@ pub fn with_isolate_scope(isolate: &Isolate, closure: ||) {
 }
 
 pub fn with_handle_scope(isolate: &Isolate, closure: ||) {
-    unsafe extern fn invoke(closure: *const ||) { 
+    unsafe extern fn trampoline(closure: *const ||) {
         (*closure)()
     }
     unsafe {
-        HandleScope_With(isolate, invoke, &closure)
+        HandleScope_With(isolate, trampoline, &closure)
+    }
+}
+
+pub fn with_try_catch(closure: |&TryCatch|) {
+    unsafe extern fn trampoline(try_catch: &TryCatch,
+                                closure: *const |&TryCatch|) {
+        (*closure)(try_catch)
+    }
+    unsafe {
+        TryCatch_With(trampoline, &closure)
     }
 }
 
@@ -127,6 +138,36 @@ impl Script {
 impl ScriptOrigin {
 }
 
+impl TryCatch {
+    pub fn CanContinue(&self) -> bool {
+        unsafe { TryCatch_CanContinue(self) }
+    }
+
+    pub fn Exception(&self) -> Local<Value> {
+        unsafe { TryCatch_Exception(self) }
+    }
+
+    pub fn HasCaught(&self) -> bool {
+        unsafe { TryCatch_HasCaught(self) }
+    }
+
+    pub fn HasTerminated(&self) -> bool {
+        unsafe { TryCatch_HasTerminated(self) }
+    }
+
+    pub fn ReThrow(&self) -> Local<Value> {
+        unsafe { TryCatch_ReThrow(self) }
+    }
+
+    pub fn Reset(&self) {
+        unsafe { TryCatch_Reset(self) }
+    }
+
+    pub fn StackTrace(&self) -> Local<Value> {
+        unsafe { TryCatch_StackTrace(self) }
+    }
+}
+
 impl V8 {
     pub fn Dispose() -> bool {
         return unsafe { V8_Dispose() }
@@ -156,6 +197,15 @@ extern {
     fn Script_Run(script: Local<Script>) -> Local<Value>;
     fn String_NewFromUtf8(isolate: &Isolate, data: *const i8, typ: i32,
                           length: i32) -> Local<String>;
+    fn TryCatch_CanContinue(try_catch: &TryCatch) -> bool;
+    fn TryCatch_Exception(try_catch: &TryCatch) -> Local<Value>;
+    fn TryCatch_HasCaught(try_catch: &TryCatch) -> bool;
+    fn TryCatch_HasTerminated(try_catch: &TryCatch) -> bool;
+    fn TryCatch_ReThrow(try_catch: &TryCatch) -> Local<Value>;
+    fn TryCatch_Reset(try_catch: &TryCatch);
+    fn TryCatch_StackTrace(try_catch: &TryCatch) -> Local<Value>;
+    fn TryCatch_With(callback: unsafe extern fn(&TryCatch, *const |&TryCatch|),
+                     closure: *const |&TryCatch|);
     fn V8_Dispose() -> bool;
     fn V8_Initialize() -> bool;
 }

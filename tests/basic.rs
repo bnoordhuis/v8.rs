@@ -11,8 +11,13 @@ fn smoketest() {
                     let raw_source = "42*42".to_c_str().as_ptr();
                     let source =
                             v8::String::NewFromUtf8(isolate, raw_source, 0, -1);
-                    let script = v8::Script::Compile(source, None);
-                    let result = script.Run();
+                    v8::with_try_catch(|try_catch| {
+                        let script = v8::Script::Compile(source, None);
+                        assert_eq!(false, try_catch.HasCaught());
+                        let result = script.Run();
+                        assert_eq!(false, result.IsEmpty());
+                        assert_eq!(false, try_catch.HasCaught());
+                    });
                 });
             });
         });
