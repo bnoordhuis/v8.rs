@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-#![feature(link_args)]
 extern crate libc;
 
 use std::default::Default;
