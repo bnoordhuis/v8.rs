@@ -20,7 +20,8 @@ endif
 V8_TARGET := $(V8_ARCH).$(V8_MODE)
 
 .PHONY: all
-all:
-	$(MAKE) -f makefile.cargo -C lib/glue/
+all: $(OUT_DIR)/libv8.so
+
+$(OUT_DIR)/libv8.so:
 	$(MAKE) -f makefile.v8 -j $(NUM_JOBS) $(V8_TARGET) $(V8_FLAGS)
-	ln -fs $(OUT_DIR)/$(V8_TARGET)/lib.target/libv8.so $(OUT_DIR)/libv8.so
+	ln -fs $(OUT_DIR)/$(V8_TARGET)/lib.target/libv8.so $@
