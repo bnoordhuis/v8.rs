@@ -91,7 +91,7 @@ extern {
 }
 
 pub trait ValueT {
-    fn inner(&self) -> *mut Value;
+    unsafe fn inner(&self) -> *mut Value;
 }
 
 macro_rules! value_methods(
@@ -99,361 +99,188 @@ macro_rules! value_methods(
         impl $ty {
             #[inline(always)]
             pub fn IsArgumentsObject(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value17IsArgumentsObjectEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value17IsArgumentsObjectEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsArray(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value7IsArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value7IsArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsArrayBuffer(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value13IsArrayBufferEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value13IsArrayBufferEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsArrayBufferView(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value17IsArrayBufferViewEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value17IsArrayBufferViewEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsBoolean(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value9IsBooleanEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value9IsBooleanEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsBooleanObject(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value15IsBooleanObjectEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value15IsBooleanObjectEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsDataView(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value10IsDataViewEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value10IsDataViewEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsDate(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value6IsDateEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value6IsDateEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsExternal(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value10IsExternalEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value10IsExternalEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsFalse(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value7IsFalseEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value7IsFalseEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsFloat32Array(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value14IsFloat32ArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value14IsFloat32ArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsFloat64Array(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value14IsFloat64ArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value14IsFloat64ArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsFunction(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value10IsFunctionEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value10IsFunctionEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsGeneratorFunction(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value19IsGeneratorFunctionEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value19IsGeneratorFunctionEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsGeneratorObject(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value17IsGeneratorObjectEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value17IsGeneratorObjectEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsInt16Array(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value12IsInt16ArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value12IsInt16ArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsInt32(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value7IsInt32Ev(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value7IsInt32Ev(self.inner()) }
             }
             #[inline(always)]
             pub fn IsInt32Array(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value12IsInt32ArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value12IsInt32ArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsInt8Array(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value11IsInt8ArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value11IsInt8ArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsMap(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value5IsMapEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value5IsMapEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsName(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value6IsNameEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value6IsNameEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsNativeError(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value13IsNativeErrorEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value13IsNativeErrorEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsNull(&self) -> bool {
                 // FIXME(bnoordhuis) Use inline heap object tag check.
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value11QuickIsNullEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value11QuickIsNullEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsNumber(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value8IsNumberEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value8IsNumberEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsNumberObject(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value14IsNumberObjectEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value14IsNumberObjectEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsObject(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value8IsObjectEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value8IsObjectEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsPromise(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value9IsPromiseEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value9IsPromiseEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsRegExp(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value8IsRegExpEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value8IsRegExpEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsSet(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value5IsSetEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value5IsSetEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsString(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value8IsStringEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value8IsStringEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsStringObject(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value14IsStringObjectEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value14IsStringObjectEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsSymbol(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value8IsSymbolEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value8IsSymbolEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsSymbolObject(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value14IsSymbolObjectEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value14IsSymbolObjectEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsTrue(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value6IsTrueEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value6IsTrueEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsTypedArray(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value12IsTypedArrayEv(mem::transmute(this))
-                    }
-                }
-            }
-            #[inline(always)]
-            pub fn IsUndefined(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value16QuickIsUndefinedEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value12IsTypedArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsUint16Array(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value13IsUint16ArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value13IsUint16ArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsUint32(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value8IsUint32Ev(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value8IsUint32Ev(self.inner()) }
             }
             #[inline(always)]
             pub fn IsUint32Array(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value13IsUint32ArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value13IsUint32ArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsUint8Array(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value12IsUint8ArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value12IsUint8ArrayEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsUint8ClampedArray(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value19IsUint8ClampedArrayEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value19IsUint8ClampedArrayEv(self.inner()) }
+            }
+            #[inline(always)]
+            pub fn IsUndefined(&self) -> bool {
+                // FIXME(bnoordhuis) Use inline heap object tag check.
+                unsafe { _ZNK2v85Value16QuickIsUndefinedEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsWeakMap(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value9IsWeakMapEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value9IsWeakMapEv(self.inner()) }
             }
             #[inline(always)]
             pub fn IsWeakSet(&self) -> bool {
-                match *self {
-                    $ty(this) => unsafe {
-                        _ZNK2v85Value9IsWeakSetEv(mem::transmute(this))
-                    }
-                }
+                unsafe { _ZNK2v85Value9IsWeakSetEv(self.inner()) }
             }
             #[inline(always)]
-            pub fn inner(&self) -> *mut $ty {
-                match *self { $ty(this) => this }
+            unsafe fn inner<T: ValueT>(&self) -> *mut T {
+                match *self { $ty(this) => mem::transmute(this) }
             }
         }
 
         impl ValueT for $ty {
             #[inline(always)]
-            fn inner(&self) -> *mut Value {
-                match *self {
-                    $ty(this) => unsafe { mem::transmute(this) }
-                }
+            unsafe fn inner(&self) -> *mut Value {
+                match *self { $ty(this) => mem::transmute(this) }
             }
         }
     );
@@ -665,11 +492,9 @@ impl Script {
     pub fn Compile(source: String,
                    origin: Option<ScriptOrigin>) -> Option<Script> {
         let _ = origin;
-        maybe(Script, match source {
-            String(source) => unsafe {
-                _ZN2v86Script7CompileENS_6HandleINS_6StringEEEPNS_12ScriptOriginE(
-                        source, ptr::null_mut())
-            }
+        maybe(Script, unsafe {
+            _ZN2v86Script7CompileENS_6HandleINS_6StringEEEPNS_12ScriptOriginE(
+                    source.inner(), ptr::null_mut())
         })
     }
 
