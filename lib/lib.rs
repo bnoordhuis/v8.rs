@@ -373,6 +373,11 @@ pub fn with_handle_scope<T>(isolate: &Isolate, closure: || -> T) -> T {
 pub struct Isolate(*mut Isolate);
 
 impl Isolate {
+    pub fn Dispose(&mut self) {
+        unsafe { _ZN2v87Isolate7DisposeEv(self.inner()); }
+        *self = Isolate(ptr::null_mut());
+    }
+
     pub fn Enter(&self) {
         unsafe { _ZN2v87Isolate5EnterEv(self.inner()) }
     }
@@ -390,12 +395,6 @@ impl Isolate {
 
     unsafe fn inner(&self) -> *mut Isolate {
         match *self { Isolate(this) => this }
-    }
-}
-
-impl Drop for Isolate {
-    fn drop(&mut self) {
-        unsafe { _ZN2v87Isolate7DisposeEv(self.inner()) }
     }
 }
 

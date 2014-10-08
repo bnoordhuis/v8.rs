@@ -72,7 +72,7 @@ fn global_object() {
 fn with_isolate_and_context(closure: |&v8::Isolate, &v8::Context|) {
     assert!(v8::V8::Initialize());
     {
-        let isolate = v8::Isolate::New(None).unwrap();
+        let mut isolate = v8::Isolate::New(None).unwrap();
         v8::with_locker(&isolate, || {
             v8::with_handle_scope(&isolate, || {
                 v8::with_isolate_scope(&isolate, || {
@@ -83,7 +83,7 @@ fn with_isolate_and_context(closure: |&v8::Isolate, &v8::Context|) {
                 });
             });
         });
-        drop(isolate);
+        isolate.Dispose();
     }
     // Don't call v8::V8::Dispose(), it permanently tears down V8.
 }
