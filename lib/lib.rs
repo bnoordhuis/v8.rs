@@ -316,15 +316,11 @@ pub struct Context(*mut Context);
 
 impl Context {
     pub fn Enter(&self) {
-        match *self {
-            Context(this) => unsafe { _ZN2v87Context5EnterEv(this) }
-        }
+        unsafe { _ZN2v87Context5EnterEv(self.inner()) }
     }
 
     pub fn Exit(&self) {
-        match *self {
-            Context(this) => unsafe { _ZN2v87Context4ExitEv(this) }
-        }
+        unsafe { _ZN2v87Context4ExitEv(self.inner()) }
     }
 
     pub fn New(isolate: &Isolate) -> Option<Context> {
@@ -333,6 +329,10 @@ impl Context {
                     isolate.inner(), ptr::null_mut(),
                     ptr::null_mut(), ptr::null_mut())
         })
+    }
+
+    unsafe fn inner(&self) -> *mut Context {
+        match *self { Context(this) => this }
     }
 }
 
