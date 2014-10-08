@@ -29,6 +29,8 @@ extern {
     fn _ZN2v86Locker8IsActiveEv() -> bool;
     fn _ZN2v86Locker8IsLockedEPNS_7IsolateE(isolate: *mut Isolate) -> bool;
     fn _ZN2v86LockerD1Ev(this: *mut Locker) -> ();
+    fn _ZN2v86Number3NewEPNS_7IsolateEd(isolate: *mut Isolate,
+                                        value: f64) -> *mut Number;
     fn _ZN2v86Object3GetENS_6HandleINS_5ValueEEE(this: *mut Object,
                                                  key: *mut Value) -> *mut Value;
     fn _ZN2v86Object3NewEPNS_7IsolateE(isolate: *mut Isolate) -> *mut Object;
@@ -89,6 +91,7 @@ extern {
     fn _ZNK2v85Value9IsWeakSetEv(this: *mut Value) -> bool;
     fn _ZNK2v85Value11QuickIsNullEv(this: *mut Value) -> bool;
     fn _ZNK2v85Value16QuickIsUndefinedEv(this: *mut Value) -> bool;
+    fn _ZNK2v85Value11NumberValueEv(this: *mut Value) -> f64;
 }
 
 pub trait ValueT {
@@ -273,6 +276,10 @@ macro_rules! value_methods(
                 unsafe { _ZNK2v85Value9IsWeakSetEv(self.inner()) }
             }
             #[inline(always)]
+            pub fn NumberValue(&self) -> f64 {
+                unsafe { _ZNK2v85Value11NumberValueEv(self.inner()) }
+            }
+            #[inline(always)]
             unsafe fn inner<T: ValueT>(&self) -> *mut T {
                 match *self { $ty(this) => mem::transmute(this) }
             }
@@ -423,6 +430,19 @@ pub fn with_locker<T>(isolate: &Isolate, closure: || -> T) -> T {
     let rval = closure();
     unsafe { _ZN2v86LockerD1Ev(&mut this) };
     rval
+}
+
+#[repr(C)]
+pub struct Number(*mut Number);
+
+value_methods!(Number)
+
+impl Number {
+    pub fn New(isolate: &Isolate, value: f64) -> Option<Number> {
+        maybe(Number, unsafe {
+            _ZN2v86Number3NewEPNS_7IsolateEd(isolate.inner(), value)
+        })
+    }
 }
 
 #[repr(C)]

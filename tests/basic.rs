@@ -38,6 +38,15 @@ fn fortytwo() {
 }
 
 #[test]
+fn basic_number() {
+    with_isolate_and_context(|isolate, _| {
+        let val = 13.37;
+        let num = v8::Number::New(isolate, val).unwrap();
+        assert_eq!(val, num.NumberValue());
+    });
+}
+
+#[test]
 fn basic_object() {
     with_isolate_and_context(|isolate, _| {
         let object = v8::Object::New(isolate).unwrap();
