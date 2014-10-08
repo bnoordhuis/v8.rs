@@ -12,6 +12,8 @@ fn smoketest0() {
                     let source =
                             v8::String::NewFromUtf8(&isolate, "42",
                                                     v8::kNormalString).unwrap();
+                    assert!(source.IsString());
+                    assert!(!source.IsStringObject());
                     let script = v8::Script::Compile(source, None).unwrap();
                     let result = script.Run().unwrap();
                     assert!(result.IsNumber());
