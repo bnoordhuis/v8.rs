@@ -328,11 +328,10 @@ impl Context {
     }
 
     pub fn New(isolate: &Isolate) -> Option<Context> {
-        maybe(Context, match *isolate {
-            Isolate(isolate) => unsafe {
-                _ZN2v87Context3NewEPNS_7IsolateEPNS_22ExtensionConfigurationENS_6HandleINS_14ObjectTemplateEEENS5_INS_5ValueEEE(
-                    isolate, ptr::null_mut(), ptr::null_mut(), ptr::null_mut())
-            }
+        maybe(Context, unsafe {
+            _ZN2v87Context3NewEPNS_7IsolateEPNS_22ExtensionConfigurationENS_6HandleINS_14ObjectTemplateEEENS5_INS_5ValueEEE(
+                    isolate.inner(), ptr::null_mut(),
+                    ptr::null_mut(), ptr::null_mut())
         })
     }
 }
@@ -352,11 +351,7 @@ struct HandleScope([*mut u8, ..3]);
 pub fn with_handle_scope<T>(isolate: &Isolate, closure: || -> T) -> T {
     let null = ptr::null_mut();
     let mut this: HandleScope = HandleScope([null, null, null]);
-    match *isolate {
-        Isolate(isolate) => unsafe {
-            _ZN2v811HandleScopeC1EPNS_7IsolateE(&mut this, isolate)
-        }
-    };
+    unsafe { _ZN2v811HandleScopeC1EPNS_7IsolateE(&mut this, isolate.inner()) };
     let rval = closure();
     unsafe { _ZN2v811HandleScopeD1Ev(&mut this) };
     rval
@@ -367,15 +362,11 @@ pub struct Isolate(*mut Isolate);
 
 impl Isolate {
     pub fn Enter(&self) {
-        match *self {
-            Isolate(this) => unsafe { _ZN2v87Isolate5EnterEv(this) }
-        }
+        unsafe { _ZN2v87Isolate5EnterEv(self.inner()) }
     }
 
     pub fn Exit(&self) {
-        match *self {
-            Isolate(this) => unsafe { _ZN2v87Isolate4ExitEv(this) }
-        }
+        unsafe { _ZN2v87Isolate4ExitEv(self.inner()) }
     }
 
     pub fn New(_: Option<CreateParams>) -> Option<Isolate> {
@@ -384,13 +375,15 @@ impl Isolate {
             _ZN2v87Isolate3NewERKNS0_12CreateParamsE(&params)
         })
     }
+
+    unsafe fn inner(&self) -> *mut Isolate {
+        match *self { Isolate(this) => this }
+    }
 }
 
 impl Drop for Isolate {
     fn drop(&mut self) {
-        match *self {
-            Isolate(this) => unsafe { _ZN2v87Isolate7DisposeEv(this) }
-        }
+        unsafe { _ZN2v87Isolate7DisposeEv(self.inner()) }
     }
 }
 
@@ -412,21 +405,15 @@ impl Locker {
     }
 
     pub fn IsLocked(isolate: &Isolate) -> bool {
-        match *isolate {
-            Isolate(isolate) => unsafe {
-                _ZN2v86Locker8IsLockedEPNS_7IsolateE(isolate)
-            }
-        }
+        unsafe { _ZN2v86Locker8IsLockedEPNS_7IsolateE(isolate.inner()) }
     }
 }
 
 pub fn with_locker<T>(isolate: &Isolate, closure: || -> T) -> T {
     let null = ptr::null_mut();
     let mut this = Locker([null, null, null]);
-    match *isolate {
-        Isolate(isolate) => unsafe {
-            _ZN2v86Locker10InitializeEPNS_7IsolateE(&mut this, isolate)
-        }
+    unsafe {
+        _ZN2v86Locker10InitializeEPNS_7IsolateE(&mut this, isolate.inner())
     };
     let rval = closure();
     unsafe { _ZN2v86LockerD1Ev(&mut this) };
@@ -446,10 +433,8 @@ impl Object {
     }
 
     pub fn New(isolate: &Isolate) -> Option<Object> {
-        maybe(Object, match *isolate {
-            Isolate(isolate) => unsafe {
-                _ZN2v86Object3NewEPNS_7IsolateE(isolate)
-            }
+        maybe(Object, unsafe {
+            _ZN2v86Object3NewEPNS_7IsolateE(isolate.inner())
         })
     }
 
@@ -516,11 +501,9 @@ value_methods!(String)
 impl String {
     pub fn NewFromUtf8(isolate: &Isolate, data: &str,
                        typ: NewStringType) -> Option<String> {
-        maybe(String, match *isolate {
-            Isolate(isolate) => unsafe {
-                _ZN2v86String11NewFromUtf8EPNS_7IsolateEPKcNS0_13NewStringTypeEi(
-                        isolate, data.as_ptr(), typ, -1)
-            }
+        maybe(String, unsafe {
+            _ZN2v86String11NewFromUtf8EPNS_7IsolateEPKcNS0_13NewStringTypeEi(
+                    isolate.inner(), data.as_ptr(), typ, -1)
         })
     }
 }
@@ -538,10 +521,8 @@ struct Unlocker(*mut u8);
 
 pub fn with_unlocker<T>(isolate: &Isolate, closure: || -> T) -> T {
     let mut this = Unlocker(ptr::null_mut());
-    match *isolate {
-        Isolate(isolate) => unsafe {
-            _ZN2v88Unlocker10InitializeEPNS_7IsolateE(&mut this, isolate)
-        }
+    unsafe {
+        _ZN2v88Unlocker10InitializeEPNS_7IsolateE(&mut this, isolate.inner())
     };
     let rval = closure();
     unsafe { _ZN2v88UnlockerD1Ev(&mut this) };
