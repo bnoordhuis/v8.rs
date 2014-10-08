@@ -16,6 +16,7 @@ fn smoketest0() {
                     assert!(!source.IsStringObject());
                     let script = v8::Script::Compile(source, None).unwrap();
                     let result = script.Run().unwrap();
+                    assert!(!result.IsNull());
                     assert!(result.IsNumber());
                 });
             });

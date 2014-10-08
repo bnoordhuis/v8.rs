@@ -72,6 +72,7 @@ extern {
     fn _ZNK2v85Value9IsPromiseEv(this: *mut Value) -> bool;
     fn _ZNK2v85Value9IsWeakMapEv(this: *mut Value) -> bool;
     fn _ZNK2v85Value9IsWeakSetEv(this: *mut Value) -> bool;
+    fn _ZNK2v85Value11QuickIsNullEv(this: *mut Value) -> bool;
 }
 
 macro_rules! value_methods(
@@ -250,6 +251,15 @@ macro_rules! value_methods(
                 match *self {
                     $ty(this) => unsafe {
                         _ZNK2v85Value13IsNativeErrorEv(mem::transmute(this))
+                    }
+                }
+            }
+            #[inline(always)]
+            pub fn IsNull(&self) -> bool {
+                // FIXME(bnoordhuis) Use inline heap object tag check.
+                match *self {
+                    $ty(this) => unsafe {
+                        _ZNK2v85Value11QuickIsNullEv(mem::transmute(this))
                     }
                 }
             }
