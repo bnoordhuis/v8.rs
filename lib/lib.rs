@@ -16,6 +16,19 @@ extern {
             isolate: *mut Isolate, extensions: *mut ExtensionConfiguration,
             global_template: *mut ObjectTemplate, global_object: *mut Value)
             -> *mut Context;
+    fn _ZNK2v820FunctionCallbackInfoINS_5ValueEE14GetReturnValueEv(
+            this: *mut FunctionCallbackInfo) -> *mut ReturnValue;
+    fn _ZNK2v820FunctionCallbackInfoINS_5ValueEEixEi(
+            this: *mut FunctionCallbackInfo,
+            index: i32) -> *mut Value;
+    fn _ZNK2v820FunctionCallbackInfoINS_5ValueEE10GetIsolateEv(
+            this: *mut FunctionCallbackInfo) -> *mut Isolate;
+    fn _ZN2v816FunctionTemplate11GetFunctionEv(this: *mut FunctionTemplate)
+                                               -> *mut Function;
+    fn _ZN2v816FunctionTemplate3NewEPNS_7IsolateEPFvRKNS_20FunctionCallbackInfoINS_5ValueEEEENS_6HandleIS4_EENSA_INS_9SignatureEEEi(
+            isolate: *mut Isolate, callback: Option<FunctionCallback>,
+            data: *mut Value, signature: *mut Signature, length: i32)
+            -> *mut FunctionTemplate;
     fn _ZN2v811HandleScopeC1EPNS_7IsolateE(this: *mut HandleScope,
                                            isolate: *mut Isolate) -> ();
     fn _ZN2v811HandleScopeD1Ev(this: *mut HandleScope) -> ();
@@ -37,6 +50,8 @@ extern {
     fn _ZN2v86Object3SetENS_6HandleINS_5ValueEEES3_(this: *mut Object,
                                                     key: *mut Value,
                                                     value: *mut Value) -> bool;
+    fn _ZN2v811ReturnValueINS_5ValueEE3SetIS1_EEvNS_6HandleIT_EE(
+            this: *mut ReturnValue, value: *mut Value) -> ();
     fn _ZN2v86Script7CompileENS_6HandleINS_6StringEEEPNS_12ScriptOriginE(
             source: *mut String, origin: *mut ScriptOrigin) -> *mut Script;
     fn _ZN2v86Script3RunEv(this: *mut Script) -> *mut Value;
@@ -358,6 +373,72 @@ pub fn with_context_scope<T>(context: &Context, closure: || -> T) -> T {
 }
 
 #[repr(C)]
+pub struct Function(*mut Function);
+
+value_methods!(Function)
+
+#[repr(C)]
+pub type FunctionCallback = extern fn(FunctionCallbackInfo);
+
+#[repr(C)]
+pub struct FunctionCallbackInfo(*mut FunctionCallbackInfo);
+
+impl FunctionCallbackInfo {
+    pub fn At(&self, index: i32) -> Value {
+        Value(unsafe {
+            _ZNK2v820FunctionCallbackInfoINS_5ValueEEixEi(self.inner(), index)
+        })
+    }
+
+    pub fn GetIsolate(&self) -> Isolate {
+        Isolate(unsafe {
+            _ZNK2v820FunctionCallbackInfoINS_5ValueEE10GetIsolateEv(self.inner())
+        })
+    }
+
+    pub fn GetReturnValue(&self) -> ReturnValue {
+        ReturnValue(unsafe {
+            _ZNK2v820FunctionCallbackInfoINS_5ValueEE14GetReturnValueEv(
+                    self.inner())
+        })
+    }
+
+    unsafe fn inner(&self) -> *mut FunctionCallbackInfo {
+        match *self { FunctionCallbackInfo(this) => this }
+    }
+}
+
+#[repr(C)]
+pub struct FunctionTemplate(*mut FunctionTemplate);
+
+impl FunctionTemplate {
+    pub fn GetFunction(&self) -> Option<Function> {
+        maybe(Function, match *self {
+            FunctionTemplate(this) => unsafe {
+                _ZN2v816FunctionTemplate11GetFunctionEv(this)
+            }
+        })
+    }
+
+    pub fn New(isolate: &Isolate, callback: Option<FunctionCallback>,
+               data: Option<Value>, signature: Option<Signature>,
+               length: i32) -> Option<FunctionTemplate> {
+        let data = match data {
+            None => ptr::null_mut(),
+            Some(Value(that)) => that,
+        };
+        let signature = match signature {
+            None => ptr::null_mut(),
+            Some(Signature(that)) => that,
+        };
+        maybe(FunctionTemplate, unsafe {
+            _ZN2v816FunctionTemplate3NewEPNS_7IsolateEPFvRKNS_20FunctionCallbackInfoINS_5ValueEEEENS_6HandleIS4_EENSA_INS_9SignatureEEEi(
+                isolate.inner(), callback, data, signature, length)
+        })
+    }
+}
+
+#[repr(C)]
 struct HandleScope([*mut u8, ..3]);
 
 pub fn with_handle_scope<T>(isolate: &Isolate, closure: || -> T) -> T {
@@ -495,6 +576,20 @@ impl Default for ResourceConstraints {
 }
 
 #[repr(C)]
+pub struct ReturnValue(*mut ReturnValue);
+
+impl ReturnValue {
+    pub fn Set<T: ValueT>(&self, value: T) {
+        match *self {
+            ReturnValue(this) => unsafe {
+                _ZN2v811ReturnValueINS_5ValueEE3SetIS1_EEvNS_6HandleIT_EE(
+                        this, value.inner())
+            }
+        }
+    }
+}
+
+#[repr(C)]
 pub struct Script(*mut Script);
 
 impl Script {
@@ -516,6 +611,9 @@ impl Script {
 
 #[repr(C)]
 pub struct ScriptOrigin;
+
+#[repr(C)]
+pub struct Signature(*mut Signature);
 
 #[repr(C)]
 pub struct String(*mut String);

@@ -69,6 +69,34 @@ fn global_object() {
     });
 }
 
+#[test]
+fn native_api_call() {
+    with_isolate_and_context(|isolate, context| {
+        extern fn f(info: v8::FunctionCallbackInfo) {
+            let isolate = info.GetIsolate();
+            assert!(info.At(0).IsNumber());
+            assert!(info.At(1).IsNumber());
+            let a = info.At(0).NumberValue();
+            let b = info.At(1).NumberValue();
+            let x = v8::Number::New(&isolate, a * b).unwrap();
+            info.GetReturnValue().Set(x);
+        }
+        let t = v8::FunctionTemplate::New(isolate, Some(f),
+                                          None, None, 0).unwrap();
+        let key = v8::String::NewFromUtf8(isolate, "f",
+                                          v8::kNormalString).unwrap();
+        let global = context.Global().unwrap();
+        global.Set(key, t.GetFunction().unwrap());
+        assert!(global.Get(key).unwrap().IsFunction());
+        let source = v8::String::NewFromUtf8(isolate, "f(1337, 42)",
+                                             v8::kNormalString).unwrap();
+        let script = v8::Script::Compile(source, None).unwrap();
+        let result = script.Run().unwrap();
+        assert!(result.IsNumber());
+        assert_eq!(result.NumberValue(), 1337. * 42.);
+    });
+}
+
 fn with_isolate_and_context(closure: |&v8::Isolate, &v8::Context|) {
     assert!(v8::V8::Initialize());
     {
