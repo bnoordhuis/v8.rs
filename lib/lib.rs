@@ -23,12 +23,20 @@ extern {
     fn _ZN2v87Isolate7DisposeEv(this: *mut Isolate) -> ();
     fn _ZN2v87Isolate5EnterEv(this: *mut Isolate) -> ();
     fn _ZN2v87Isolate4ExitEv(this: *mut Isolate) -> ();
+    fn _ZN2v86Locker10InitializeEPNS_7IsolateE(this: *mut Locker,
+                                               isolate: *mut Isolate) -> ();
+    fn _ZN2v86Locker8IsActiveEv() -> bool;
+    fn _ZN2v86Locker8IsLockedEPNS_7IsolateE(isolate: *mut Isolate) -> bool;
+    fn _ZN2v86LockerD1Ev(this: *mut Locker) -> ();
     fn _ZN2v86Script7CompileENS_6HandleINS_6StringEEEPNS_12ScriptOriginE(
             source: *mut String, origin: *mut ScriptOrigin) -> *mut Script;
     fn _ZN2v86Script3RunEv(this: *mut Script) -> *mut Value;
     fn _ZN2v86String11NewFromUtf8EPNS_7IsolateEPKcNS0_13NewStringTypeEi(
             isolate: *mut Isolate, data: *const u8, typ: NewStringType,
             length: i32) -> *mut String;
+    fn _ZN2v88Unlocker10InitializeEPNS_7IsolateE(this: *mut Unlocker,
+                                                 isolate: *mut Isolate) -> ();
+    fn _ZN2v88UnlockerD1Ev(this: *mut Unlocker) -> ();
     fn _ZN2v82V810InitializeEv() -> bool;
     fn _ZN2v82V87DisposeEv() -> bool;
     fn _ZNK2v85Value10IsDataViewEv(this: *mut Value) -> bool;
@@ -546,6 +554,36 @@ pub fn with_isolate_scope<T>(isolate: &Isolate, closure: || -> T) -> T {
 }
 
 #[repr(C)]
+pub struct Locker([*mut u8, ..3]);
+
+impl Locker {
+    pub fn IsActive() -> bool {
+        unsafe { _ZN2v86Locker8IsActiveEv() }
+    }
+
+    pub fn IsLocked(isolate: &Isolate) -> bool {
+        match *isolate {
+            Isolate(isolate) => unsafe {
+                _ZN2v86Locker8IsLockedEPNS_7IsolateE(isolate)
+            }
+        }
+    }
+}
+
+pub fn with_locker<T>(isolate: &Isolate, closure: || -> T) -> T {
+    let null = ptr::null_mut();
+    let mut this = Locker([null, null, null]);
+    match *isolate {
+        Isolate(isolate) => unsafe {
+            _ZN2v86Locker10InitializeEPNS_7IsolateE(&mut this, isolate)
+        }
+    };
+    let rval = closure();
+    unsafe { _ZN2v86LockerD1Ev(&mut this) };
+    rval
+}
+
+#[repr(C)]
 pub struct ResourceConstraints {
     max_semi_space_size: i32,
     max_old_space_size: i32,
@@ -616,6 +654,21 @@ pub enum NewStringType {
     kNormalString,
     kInternalizedString,
     kUndetectableString,
+}
+
+#[repr(C)]
+struct Unlocker(*mut u8);
+
+pub fn with_unlocker<T>(isolate: &Isolate, closure: || -> T) -> T {
+    let mut this = Unlocker(ptr::null_mut());
+    match *isolate {
+        Isolate(isolate) => unsafe {
+            _ZN2v88Unlocker10InitializeEPNS_7IsolateE(&mut this, isolate)
+        }
+    };
+    let rval = closure();
+    unsafe { _ZN2v88UnlockerD1Ev(&mut this) };
+    rval
 }
 
 #[repr(C)]
