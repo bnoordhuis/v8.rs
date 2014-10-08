@@ -18,6 +18,7 @@ fn smoketest0() {
                     let result = script.Run().unwrap();
                     assert!(!result.IsNull());
                     assert!(result.IsNumber());
+                    assert!(!result.IsUndefined());
                 });
             });
         });

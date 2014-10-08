@@ -73,6 +73,7 @@ extern {
     fn _ZNK2v85Value9IsWeakMapEv(this: *mut Value) -> bool;
     fn _ZNK2v85Value9IsWeakSetEv(this: *mut Value) -> bool;
     fn _ZNK2v85Value11QuickIsNullEv(this: *mut Value) -> bool;
+    fn _ZNK2v85Value16QuickIsUndefinedEv(this: *mut Value) -> bool;
 }
 
 macro_rules! value_methods(
@@ -356,6 +357,14 @@ macro_rules! value_methods(
                 match *self {
                     $ty(this) => unsafe {
                         _ZNK2v85Value12IsTypedArrayEv(mem::transmute(this))
+                    }
+                }
+            }
+            #[inline(always)]
+            pub fn IsUndefined(&self) -> bool {
+                match *self {
+                    $ty(this) => unsafe {
+                        _ZNK2v85Value16QuickIsUndefinedEv(mem::transmute(this))
                     }
                 }
             }
