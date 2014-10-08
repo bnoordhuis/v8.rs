@@ -28,6 +28,12 @@ extern {
     fn _ZN2v86Locker8IsActiveEv() -> bool;
     fn _ZN2v86Locker8IsLockedEPNS_7IsolateE(isolate: *mut Isolate) -> bool;
     fn _ZN2v86LockerD1Ev(this: *mut Locker) -> ();
+    fn _ZN2v86Object3GetENS_6HandleINS_5ValueEEE(this: *mut Object,
+                                                 key: *mut Value) -> *mut Value;
+    fn _ZN2v86Object3NewEPNS_7IsolateE(isolate: *mut Isolate) -> *mut Object;
+    fn _ZN2v86Object3SetENS_6HandleINS_5ValueEEES3_(this: *mut Object,
+                                                    key: *mut Value,
+                                                    value: *mut Value) -> bool;
     fn _ZN2v86Script7CompileENS_6HandleINS_6StringEEEPNS_12ScriptOriginE(
             source: *mut String, origin: *mut ScriptOrigin) -> *mut Script;
     fn _ZN2v86Script3RunEv(this: *mut Script) -> *mut Value;
@@ -82,6 +88,10 @@ extern {
     fn _ZNK2v85Value9IsWeakSetEv(this: *mut Value) -> bool;
     fn _ZNK2v85Value11QuickIsNullEv(this: *mut Value) -> bool;
     fn _ZNK2v85Value16QuickIsUndefinedEv(this: *mut Value) -> bool;
+}
+
+pub trait ValueT {
+    fn inner(&self) -> *mut Value;
 }
 
 macro_rules! value_methods(
@@ -432,6 +442,19 @@ macro_rules! value_methods(
                     }
                 }
             }
+            #[inline(always)]
+            pub fn inner(&self) -> *mut $ty {
+                match *self { $ty(this) => this }
+            }
+        }
+
+        impl ValueT for $ty {
+            #[inline(always)]
+            fn inner(&self) -> *mut Value {
+                match *self {
+                    $ty(this) => unsafe { mem::transmute(this) }
+                }
+            }
         }
     );
 )
@@ -581,6 +604,35 @@ pub fn with_locker<T>(isolate: &Isolate, closure: || -> T) -> T {
     let rval = closure();
     unsafe { _ZN2v86LockerD1Ev(&mut this) };
     rval
+}
+
+#[repr(C)]
+pub struct Object(*mut Object);
+
+value_methods!(Object)
+
+impl Object {
+    pub fn Get<K: ValueT>(&self, key: K) -> Option<Value> {
+        maybe(Value, unsafe {
+            _ZN2v86Object3GetENS_6HandleINS_5ValueEEE(self.inner(), key.inner())
+        })
+    }
+
+    pub fn New(isolate: &Isolate) -> Option<Object> {
+        maybe(Object, match *isolate {
+            Isolate(isolate) => unsafe {
+                _ZN2v86Object3NewEPNS_7IsolateE(isolate)
+            }
+        })
+    }
+
+    pub fn Set<K: ValueT, V: ValueT>(&self, key: K, value: V) -> bool {
+        unsafe {
+            _ZN2v86Object3SetENS_6HandleINS_5ValueEEES3_(self.inner(),
+                                                         key.inner(),
+                                                         value.inner())
+        }
+    }
 }
 
 #[repr(C)]

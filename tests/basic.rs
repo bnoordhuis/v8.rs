@@ -37,6 +37,20 @@ fn fortytwo() {
     });
 }
 
+#[test]
+fn basic_object() {
+    with_isolate_and_context(|isolate, _| {
+        let object = v8::Object::New(isolate).unwrap();
+        assert!(object.IsObject());
+        let key = v8::String::NewFromUtf8(isolate, "the_key",
+                                          v8::kNormalString).unwrap();
+        let value = v8::String::NewFromUtf8(isolate, "the_value",
+                                            v8::kNormalString).unwrap();
+        assert!(object.Set(key, value));
+        assert!(object.Get(key).unwrap().IsString());
+    });
+}
+
 fn with_isolate_and_context(closure: |&v8::Isolate, &v8::Context|) {
     assert!(v8::V8::Initialize());
     {
