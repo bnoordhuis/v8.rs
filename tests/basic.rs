@@ -51,6 +51,15 @@ fn basic_object() {
     });
 }
 
+#[test]
+fn global_object() {
+    with_isolate_and_context(|isolate, context| {
+        let key = v8::String::NewFromUtf8(isolate, "Object",
+                                          v8::kNormalString).unwrap();
+        assert!(context.Global().unwrap().Get(key).unwrap().IsObject());
+    });
+}
+
 fn with_isolate_and_context(closure: |&v8::Isolate, &v8::Context|) {
     assert!(v8::V8::Initialize());
     {

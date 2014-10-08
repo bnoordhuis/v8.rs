@@ -9,8 +9,9 @@ use std::ptr;
 
 #[link(name="v8")]
 extern {
-    fn _ZN2v87Context5EnterEv(this: *mut Context) -> ();
     fn _ZN2v87Context4ExitEv(this: *mut Context) -> ();
+    fn _ZN2v87Context5EnterEv(this: *mut Context) -> ();
+    fn _ZN2v87Context6GlobalEv(this: *mut Context) -> *mut Object;
     fn _ZN2v87Context3NewEPNS_7IsolateEPNS_22ExtensionConfigurationENS_6HandleINS_14ObjectTemplateEEENS5_INS_5ValueEEE(
             isolate: *mut Isolate, extensions: *mut ExtensionConfiguration,
             global_template: *mut ObjectTemplate, global_object: *mut Value)
@@ -321,6 +322,10 @@ impl Context {
 
     pub fn Exit(&self) {
         unsafe { _ZN2v87Context4ExitEv(self.inner()) }
+    }
+
+    pub fn Global(&self) -> Option<Object> {
+        maybe(Object, unsafe { _ZN2v87Context6GlobalEv(self.inner()) })
     }
 
     pub fn New(isolate: &Isolate) -> Option<Context> {
