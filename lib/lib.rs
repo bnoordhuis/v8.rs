@@ -619,7 +619,7 @@ impl String {
                        typ: NewStringType) -> Option<String> {
         unsafe {
             _ZN2v86String11NewFromUtf8EPNS_7IsolateEPKcNS0_13NewStringTypeEi(
-                    isolate, data.as_ptr(), typ, -1)
+                    isolate, data.as_ptr(), typ, data.len() as i32)
         }.to_option()
     }
 }
