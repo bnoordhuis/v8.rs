@@ -69,6 +69,7 @@ fn global_object() {
     });
 }
 
+#[ignore]
 #[test]
 fn native_api_call() {
     with_isolate_and_context(|isolate, context| {
