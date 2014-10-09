@@ -28,6 +28,17 @@ fn lock_and_unlock() {
 }
 
 #[test]
+fn eq() {
+    with_isolate_and_context(|isolate, _| {
+        let a = v8::Object::New(isolate).unwrap();
+        let b = v8::Object::New(isolate).unwrap();
+        assert_eq!(a, a);
+        assert_eq!(b, b);
+        assert!(a != b);
+    });
+}
+
+#[test]
 fn show() {
     with_isolate_and_context(|isolate, _| {
         let val = v8::Number::New(isolate, 13.37).unwrap();

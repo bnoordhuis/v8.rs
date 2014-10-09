@@ -112,6 +112,11 @@ pub trait ValueT {
 macro_rules! data_methods(
     ($ty:ident) => (
         impl $ty {
+            #[inline(always)]
+            fn raw_ptr(&self) -> *mut $ty {
+                match *self { $ty(that) => that }
+            }
+
             #[allow(dead_code)]
             fn to_option(&self) -> Option<$ty> {
                 match *self {
@@ -124,6 +129,12 @@ macro_rules! data_methods(
         impl Default for $ty {
             fn default() -> $ty {
                 $ty(ptr::null_mut())
+            }
+        }
+
+        impl PartialEq for $ty {
+            fn eq(&self, that: &$ty) -> bool {
+                self.raw_ptr() == that.raw_ptr()
             }
         }
 
