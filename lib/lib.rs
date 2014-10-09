@@ -119,9 +119,10 @@ macro_rules! data_methods(
 
             #[allow(dead_code)]
             fn to_option(&self) -> Option<$ty> {
-                match *self {
-                    $ty(that) if that.is_null() => None,
-                    that => Some(that),
+                if self.raw_ptr().is_null() {
+                    None
+                } else {
+                    Some(*self)
                 }
             }
         }
@@ -142,8 +143,7 @@ macro_rules! data_methods(
             // TODO(bnoordhuis) Maybe specialize for SMIs and strings.
             // Maybe ToString() objects?
             fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-                write!(fmt, "{}({:p})", stringify!($ty),
-                       match *self { $ty(val) => val })
+                write!(fmt, "{}({:p})", stringify!($ty), self.raw_ptr())
             }
         }
     );
