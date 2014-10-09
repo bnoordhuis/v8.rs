@@ -78,7 +78,7 @@ fn native_api_call() {
             assert!(info.At(1).IsNumber());
             let a = info.At(0).NumberValue();
             let b = info.At(1).NumberValue();
-            let x = v8::Number::New(&isolate, a * b).unwrap();
+            let x = v8::Number::New(isolate, a * b).unwrap();
             info.GetReturnValue().Set(x);
         }
         let t = v8::FunctionTemplate::New(isolate, Some(f),
@@ -97,16 +97,16 @@ fn native_api_call() {
     });
 }
 
-fn with_isolate_and_context(closure: |&v8::Isolate, &v8::Context|) {
+fn with_isolate_and_context(closure: |v8::Isolate, v8::Context|) {
     assert!(v8::V8::Initialize());
     {
         let mut isolate = v8::Isolate::New(None).unwrap();
-        v8::with_locker(&isolate, || {
-            v8::with_handle_scope(&isolate, || {
-                v8::with_isolate_scope(&isolate, || {
-                    let context = v8::Context::New(&isolate).unwrap();
-                    v8::with_context_scope(&context, || {
-                        closure(&isolate, &context)
+        v8::with_locker(isolate, || {
+            v8::with_handle_scope(isolate, || {
+                v8::with_isolate_scope(isolate, || {
+                    let context = v8::Context::New(isolate).unwrap();
+                    v8::with_context_scope(context, || {
+                        closure(isolate, context)
                     });
                 });
             });
