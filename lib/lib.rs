@@ -4,6 +4,7 @@
 extern crate libc;
 
 use std::default::Default;
+use std::fmt;
 use std::mem;
 use std::ptr;
 
@@ -123,6 +124,15 @@ macro_rules! data_methods(
         impl Default for $ty {
             fn default() -> $ty {
                 $ty(ptr::null_mut())
+            }
+        }
+
+        impl fmt::Show for $ty {
+            // TODO(bnoordhuis) Maybe specialize for SMIs and strings.
+            // Maybe ToString() objects?
+            fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+                write!(fmt, "{}({:p})", stringify!($ty),
+                       match *self { $ty(val) => val })
             }
         }
     );

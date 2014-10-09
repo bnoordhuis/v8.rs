@@ -1,3 +1,8 @@
+#![feature(phase)]
+
+#[phase(plugin)]
+extern crate regex_macros;
+extern crate regex;
 extern crate v8;
 
 #[test]
@@ -19,6 +24,20 @@ fn lock_and_unlock() {
             assert!(!v8::Locker::IsLocked(isolate));
         });
         assert!(v8::Locker::IsLocked(isolate));
+    });
+}
+
+#[test]
+fn show() {
+    with_isolate_and_context(|isolate, _| {
+        let val = v8::Number::New(isolate, 13.37).unwrap();
+        let re = regex!("Number\\(0x[0-9a-f]+\\)");
+        let pp = format!("{}", val);
+        assert!(re.is_match(pp.as_slice()));
+        let val = v8::Object::New(isolate).unwrap();
+        let re = regex!("Object\\(0x[0-9a-f]+\\)");
+        let pp = format!("{}", val);
+        assert!(re.is_match(pp.as_slice()));
     });
 }
 
