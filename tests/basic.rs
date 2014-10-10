@@ -68,6 +68,17 @@ fn fortytwo() {
 }
 
 #[test]
+fn primitives() {
+    with_isolate_and_context(|isolate, _| {
+        assert!(v8::Null(isolate).IsNull());
+        assert!(v8::Undefined(isolate).IsUndefined());
+        assert!(v8::True(isolate).IsTrue());
+        assert!(v8::False(isolate).IsFalse());
+        assert!(v8::String::Empty(isolate).IsString());
+    });
+}
+
+#[test]
 fn basic_number() {
     with_isolate_and_context(|isolate, _| {
         let val = 13.37;

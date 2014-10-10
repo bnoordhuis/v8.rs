@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(non_uppercase_statics)]
 #![feature(macro_rules)]
 
 extern crate libc;
@@ -7,6 +8,21 @@ use std::default::Default;
 use std::fmt;
 use std::mem;
 use std::ptr;
+
+#[cfg(target_word_size="32")] static kApiPointerSize: uint = 4;
+#[cfg(target_word_size="64")] static kApiPointerSize: uint = 8;
+static kApiInt64Size: uint = 8;
+static kAmountOfExternalAllocatedMemoryOffset: uint = 4 * kApiPointerSize;
+static kAmountOfExternalAllocatedMemoryAtLastGlobalGCOffset: uint =
+        kAmountOfExternalAllocatedMemoryOffset + kApiInt64Size;
+static kIsolateRootsOffset: uint =
+        kAmountOfExternalAllocatedMemoryAtLastGlobalGCOffset + kApiInt64Size +
+        kApiPointerSize;
+static kUndefinedValueRootIndex: uint = 5;
+static kNullValueRootIndex: uint = 7;
+static kTrueValueRootIndex: uint = 8;
+static kFalseValueRootIndex: uint = 9;
+static kEmptyStringRootIndex: uint = 152;
 
 #[link(name="v8")]
 extern {
@@ -566,6 +582,33 @@ impl Default for ObjectTemplate {
 }
 
 #[repr(C)]
+pub struct Primitive(*mut *mut Primitive);
+
+value_methods!(Primitive)
+
+pub fn Null(isolate: Isolate) -> Primitive {
+    GetRoot(Primitive, isolate, kNullValueRootIndex)
+}
+
+pub fn Undefined(isolate: Isolate) -> Primitive {
+    GetRoot(Primitive, isolate, kUndefinedValueRootIndex)
+}
+
+pub fn True(isolate: Isolate) -> Primitive {
+    GetRoot(Primitive, isolate, kTrueValueRootIndex)
+}
+
+pub fn False(isolate: Isolate) -> Primitive {
+    GetRoot(Primitive, isolate, kFalseValueRootIndex)
+}
+
+fn GetRoot<T>(make: |*mut *mut T| -> T, isolate: Isolate, index: uint) -> T {
+    let base = match isolate { Isolate(that) => that as uint };
+    let addr = base + kIsolateRootsOffset + index * kApiPointerSize;
+    make(addr as *mut *mut T)
+}
+
+#[repr(C)]
 pub struct ResourceConstraints {
     max_semi_space_size: i32,
     max_old_space_size: i32,
@@ -635,6 +678,10 @@ pub struct String(*mut *mut String);
 value_methods!(String)
 
 impl String {
+    pub fn Empty(isolate: Isolate) -> String {
+        GetRoot(String, isolate, kEmptyStringRootIndex)
+    }
+
     pub fn NewFromUtf8(isolate: Isolate, data: &str,
                        typ: NewStringType) -> Option<String> {
         unsafe {
