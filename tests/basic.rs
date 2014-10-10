@@ -95,6 +95,8 @@ fn integers() {
         assert_eq!(42, v8::Integer::New(isolate, 42).unwrap().Value());
         assert_eq!(-1 as u32 as i64,
                    v8::Integer::NewFromUnsigned(isolate, -1).unwrap().Value());
+        assert_eq!(-1, v8::Int32::New(isolate, -1).unwrap().Value());
+        assert_eq!(-1 as u32, v8::Uint32::New(isolate, -1).unwrap().Value());
     });
 }
 

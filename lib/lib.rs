@@ -506,26 +506,53 @@ pub fn with_handle_scope<T>(isolate: Isolate, closure: || -> T) -> T {
     rval
 }
 
+// XXX(bnoordhuis) Deviates slightly from the C++ definition in that Int32 and
+// Uint32 don't inherit from Integer.  As a result, New() and NewFromUnsigned()
+// return the concrete type, not the base type (e.g. Int32 instead of Integer.)
+macro_rules! integer_methods(
+    ($ty:ident, $rty:ty) => (
+        value_methods!($ty)
+
+        impl $ty {
+            pub fn New(isolate: Isolate, value: i32) -> Option<$ty> {
+                let that = unsafe {
+                    _ZN2v87Integer3NewEPNS_7IsolateEi(isolate, value)
+                };
+                match that {
+                    Integer(that) => $ty(unsafe { mem::transmute(that) })
+                }.to_option()
+            }
+
+            pub fn NewFromUnsigned(isolate: Isolate, value: u32) -> Option<$ty> {
+                let that = unsafe {
+                    _ZN2v87Integer15NewFromUnsignedEPNS_7IsolateEj(isolate,
+                                                                   value)
+                };
+                match that {
+                    Integer(that) => $ty(unsafe { mem::transmute(that) })
+                }.to_option()
+            }
+
+            pub fn Value(&self) -> $rty {
+                unsafe {
+                    _ZNK2v87Integer5ValueEv(mem::transmute(*self)) as $rty
+                }
+            }
+        }
+    );
+)
+
 #[repr(C)]
 pub struct Integer(*mut *mut Integer);
+integer_methods!(Integer, i64)
 
-value_methods!(Integer)
+#[repr(C)]
+pub struct Int32(*mut *mut Int32);
+integer_methods!(Int32, i32)
 
-impl Integer {
-    pub fn New(isolate: Isolate, value: i32) -> Option<Integer> {
-        unsafe { _ZN2v87Integer3NewEPNS_7IsolateEi(isolate, value) }.to_option()
-    }
-
-    pub fn NewFromUnsigned(isolate: Isolate, value: u32) -> Option<Integer> {
-        unsafe {
-            _ZN2v87Integer15NewFromUnsignedEPNS_7IsolateEj(isolate, value)
-        }.to_option()
-    }
-
-    pub fn Value(&self) -> i64 {
-        unsafe { _ZNK2v87Integer5ValueEv(*self) }
-    }
-}
+#[repr(C)]
+pub struct Uint32(*mut *mut Uint32);
+integer_methods!(Uint32, u32)
 
 #[repr(C)]
 pub struct Isolate(*mut Isolate);
