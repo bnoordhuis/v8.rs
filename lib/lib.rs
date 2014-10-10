@@ -46,8 +46,6 @@ extern {
     fn _ZN2v86Object3NewEPNS_7IsolateE(isolate: Isolate) -> Object;
     fn _ZN2v86Object3SetENS_6HandleINS_5ValueEEES3_(this: Object, key: Value,
                                                     value: Value) -> bool;
-    fn _ZN2v811ReturnValueINS_5ValueEE3SetIS1_EEvNS_6HandleIT_EE(
-            this: ReturnValue, value: Value);
     fn _ZN2v86Script7CompileENS_6HandleINS_6StringEEEPNS_12ScriptOriginE(
             source: String, origin: *mut ScriptOrigin) -> Script;
     fn _ZN2v86Script3RunEv(this: Script) -> Value;
@@ -113,7 +111,7 @@ macro_rules! data_methods(
     ($ty:ident) => (
         impl $ty {
             #[inline(always)]
-            fn raw_ptr(&self) -> *mut $ty {
+            fn raw_ptr(&self) -> *mut *mut $ty {
                 match *self { $ty(that) => that }
             }
 
@@ -370,7 +368,7 @@ impl Default for CreateParams {
 }
 
 #[repr(C)]
-pub struct Context(*mut Context);
+pub struct Context(*mut *mut Context);
 
 data_methods!(Context)
 
@@ -406,7 +404,7 @@ pub fn with_context_scope<T>(context: Context, closure: || -> T) -> T {
 }
 
 #[repr(C)]
-pub struct Function(*mut Function);
+pub struct Function(*mut *mut Function);
 
 value_methods!(Function)
 
@@ -414,7 +412,7 @@ value_methods!(Function)
 pub type FunctionCallback = extern fn(FunctionCallbackInfo);
 
 #[repr(C)]
-pub struct FunctionCallbackInfo(*mut FunctionCallbackInfo);
+pub struct FunctionCallbackInfo(*mut *mut FunctionCallbackInfo);
 
 impl FunctionCallbackInfo {
     pub fn At(&self, index: i32) -> Value {
@@ -433,7 +431,7 @@ impl FunctionCallbackInfo {
 }
 
 #[repr(C)]
-pub struct FunctionTemplate(*mut FunctionTemplate);
+pub struct FunctionTemplate(*mut *mut FunctionTemplate);
 
 data_methods!(FunctionTemplate)
 
@@ -524,7 +522,7 @@ pub fn with_locker<T>(isolate: Isolate, closure: || -> T) -> T {
 }
 
 #[repr(C)]
-pub struct Number(*mut Number);
+pub struct Number(*mut *mut Number);
 
 value_methods!(Number)
 
@@ -535,7 +533,7 @@ impl Number {
 }
 
 #[repr(C)]
-pub struct Object(*mut Object);
+pub struct Object(*mut *mut Object);
 
 value_methods!(Object)
 
@@ -559,7 +557,7 @@ impl Object {
 }
 
 #[repr(C)]
-pub struct ObjectTemplate(*mut ObjectTemplate);
+pub struct ObjectTemplate(*mut *mut ObjectTemplate);
 
 impl Default for ObjectTemplate {
     fn default() -> ObjectTemplate {
@@ -591,19 +589,20 @@ impl Default for ResourceConstraints {
 }
 
 #[repr(C)]
-pub struct ReturnValue(*mut ReturnValue);
+pub struct ReturnValue(*mut *mut Value);
 
 impl ReturnValue {
     pub fn Set<T: ValueT>(&self, value: T) {
-        unsafe {
-            _ZN2v811ReturnValueINS_5ValueEE3SetIS1_EEvNS_6HandleIT_EE(
-                    *self, value.as_val())
+        match value.as_val() {
+            Value(that) => unsafe {
+                match *self { ReturnValue(this) => *this = *that }
+            }
         }
     }
 }
 
 #[repr(C)]
-pub struct Script(*mut Script);
+pub struct Script(*mut *mut Script);
 
 data_methods!(Script)
 
@@ -626,12 +625,12 @@ impl Script {
 pub struct ScriptOrigin;
 
 #[repr(C)]
-pub struct Signature(*mut Signature);
+pub struct Signature(*mut *mut Signature);
 
 data_methods!(Signature)
 
 #[repr(C)]
-pub struct String(*mut String);
+pub struct String(*mut *mut String);
 
 value_methods!(String)
 
@@ -678,6 +677,6 @@ impl V8 {
 }
 
 #[repr(C)]
-pub struct Value(*mut Value);
+pub struct Value(*mut *mut Value);
 
 value_methods!(Value)
