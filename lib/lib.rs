@@ -525,6 +525,22 @@ impl Isolate {
             this => Some(this),
         }
     }
+
+    fn raw_ptr(&self) -> *mut Isolate {
+        match *self { Isolate(that) => that }
+    }
+}
+
+impl PartialEq for Isolate {
+    fn eq(&self, that: &Isolate) -> bool {
+        self.raw_ptr() == that.raw_ptr()
+    }
+}
+
+impl fmt::Show for Isolate {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Isolate({:p})", self.raw_ptr())
+    }
 }
 
 // Can't use a RAII type for Isolate::Scope because of
