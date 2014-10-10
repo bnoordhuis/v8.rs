@@ -90,6 +90,15 @@ fn booleans() {
 }
 
 #[test]
+fn integers() {
+    with_isolate_and_context(|isolate, _| {
+        assert_eq!(42, v8::Integer::New(isolate, 42).unwrap().Value());
+        assert_eq!(-1 as u32 as i64,
+                   v8::Integer::NewFromUnsigned(isolate, -1).unwrap().Value());
+    });
+}
+
+#[test]
 fn basic_number() {
     with_isolate_and_context(|isolate, _| {
         let val = 13.37;

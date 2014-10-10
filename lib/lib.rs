@@ -46,6 +46,11 @@ extern {
     fn _ZN2v811HandleScopeC1EPNS_7IsolateE(this: &mut HandleScope,
                                            isolate: Isolate);
     fn _ZN2v811HandleScopeD1Ev(this: &mut HandleScope);
+    fn _ZN2v87Integer15NewFromUnsignedEPNS_7IsolateEj(isolate: Isolate,
+                                                      value: u32) -> Integer;
+    fn _ZN2v87Integer3NewEPNS_7IsolateEi(isolate: Isolate,
+                                         value: i32) -> Integer;
+    fn _ZNK2v87Integer5ValueEv(this: Integer) -> i64;
     fn _ZN2v87Isolate3NewERKNS0_12CreateParamsE(params: &CreateParams)
                                                 -> Isolate;
     fn _ZN2v87Isolate7DisposeEv(this: Isolate);
@@ -499,6 +504,27 @@ pub fn with_handle_scope<T>(isolate: Isolate, closure: || -> T) -> T {
     let rval = closure();
     unsafe { _ZN2v811HandleScopeD1Ev(&mut this) };
     rval
+}
+
+#[repr(C)]
+pub struct Integer(*mut *mut Integer);
+
+value_methods!(Integer)
+
+impl Integer {
+    pub fn New(isolate: Isolate, value: i32) -> Option<Integer> {
+        unsafe { _ZN2v87Integer3NewEPNS_7IsolateEi(isolate, value) }.to_option()
+    }
+
+    pub fn NewFromUnsigned(isolate: Isolate, value: u32) -> Option<Integer> {
+        unsafe {
+            _ZN2v87Integer15NewFromUnsignedEPNS_7IsolateEj(isolate, value)
+        }.to_option()
+    }
+
+    pub fn Value(&self) -> i64 {
+        unsafe { _ZNK2v87Integer5ValueEv(*self) }
+    }
 }
 
 #[repr(C)]
