@@ -126,12 +126,14 @@ fn native_api_call() {
     with_isolate_and_context(|isolate, context| {
         extern fn f(info: v8::FunctionCallbackInfo) {
             let isolate = info.GetIsolate();
+            let return_value = info.GetReturnValue();
+            assert_eq!(isolate, return_value.GetIsolate());
             assert!(info.At(0).IsNumber());
             assert!(info.At(1).IsNumber());
             let a = info.At(0).NumberValue();
             let b = info.At(1).NumberValue();
             let x = v8::Number::New(isolate, a * b).unwrap();
-            info.GetReturnValue().Set(x);
+            return_value.Set(x);
         }
         let t = v8::FunctionTemplate::New(isolate, Some(f),
                                           None, None, 0).unwrap();

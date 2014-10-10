@@ -672,6 +672,16 @@ impl Default for ResourceConstraints {
 pub struct ReturnValue(*mut *mut Value);
 
 impl ReturnValue {
+    pub fn GetIsolate(&self) -> Isolate {
+        match *self {
+            ReturnValue(this) => {
+                let that = this as uint - 2 * kApiPointerSize;
+                let that: *const *mut Isolate = unsafe { mem::transmute(that) };
+                Isolate(unsafe { *that })
+            }
+        }
+    }
+
     pub fn Set<T: ValueT>(&self, value: T) {
         match value.as_val() {
             Value(that) => unsafe {
