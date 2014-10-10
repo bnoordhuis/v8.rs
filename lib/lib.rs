@@ -68,6 +68,7 @@ extern {
     fn _ZN2v86String11NewFromUtf8EPNS_7IsolateEPKcNS0_13NewStringTypeEi(
             isolate: Isolate, data: *const u8,
             typ: NewStringType, length: i32) -> String;
+    fn _ZNK2v86String6LengthEv(this: String) -> i32;
     fn _ZN2v88Unlocker10InitializeEPNS_7IsolateE(this: &mut Unlocker,
                                                  isolate: Isolate);
     fn _ZN2v88UnlockerD1Ev(this: &mut Unlocker);
@@ -700,6 +701,10 @@ value_methods!(String)
 impl String {
     pub fn Empty(isolate: Isolate) -> String {
         GetRoot(String, isolate, kEmptyStringRootIndex)
+    }
+
+    pub fn Length(&self) -> int {
+        unsafe { _ZNK2v86String6LengthEv(*self) as int }
     }
 
     pub fn NewFromUtf8(isolate: Isolate, data: &str,

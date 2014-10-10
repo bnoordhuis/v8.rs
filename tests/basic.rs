@@ -75,6 +75,7 @@ fn primitives() {
         assert!(v8::True(isolate).IsTrue());
         assert!(v8::False(isolate).IsFalse());
         assert!(v8::String::Empty(isolate).IsString());
+        assert!(v8::String::Empty(isolate).Length() == 0);
     });
 }
 
