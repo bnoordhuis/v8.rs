@@ -683,10 +683,24 @@ impl ReturnValue {
     }
 
     pub fn Set<T: ValueT>(&self, value: T) {
-        match value.as_val() {
-            Value(that) => unsafe {
-                match *self { ReturnValue(this) => *this = *that }
-            }
+        self.set(value.as_val())
+    }
+
+    pub fn SetEmptyString(&self) {
+        self.set(GetRoot(Value, self.GetIsolate(), kEmptyStringRootIndex))
+    }
+
+    pub fn SetNull(&self) {
+        self.set(GetRoot(Value, self.GetIsolate(), kNullValueRootIndex))
+    }
+
+    pub fn SetUndefined(&self) {
+        self.set(GetRoot(Value, self.GetIsolate(), kUndefinedValueRootIndex))
+    }
+
+    pub fn set(&self, value: Value) {
+        match (*self, value) {
+            (ReturnValue(this), Value(that)) => unsafe { *this = *that }
         }
     }
 }

@@ -136,19 +136,44 @@ fn native_api_call() {
             return_value.Set(x);
         }
         let t = v8::FunctionTemplate::New(isolate, Some(f),
-                                          None, None, 0).unwrap();
+                                          None, None, 2).unwrap();
         let key = v8::String::NewFromUtf8(isolate, "f",
                                           v8::kNormalString).unwrap();
         let global = context.Global().unwrap();
         global.Set(key, t.GetFunction().unwrap());
         assert!(global.Get(key).unwrap().IsFunction());
-        let source = v8::String::NewFromUtf8(isolate, "f(1337, 42)",
-                                             v8::kNormalString).unwrap();
-        let script = v8::Script::Compile(source, None).unwrap();
-        let result = script.Run().unwrap();
+        let result = eval(isolate, "f(1337, 42)").unwrap();
         assert!(result.IsNumber());
         assert_eq!(result.NumberValue(), 1337. * 42.);
     });
+}
+
+#[test]
+fn return_values() {
+    with_isolate_and_context(|isolate, context| {
+        extern fn f(info: v8::FunctionCallbackInfo) {
+            match info.At(0).NumberValue() {
+                0. => info.GetReturnValue().SetEmptyString(),
+                1. => info.GetReturnValue().SetNull(),
+                _ => info.GetReturnValue().SetUndefined(),
+            }
+        }
+        let t = v8::FunctionTemplate::New(isolate, Some(f),
+                                          None, None, 1).unwrap();
+        let key = v8::String::NewFromUtf8(isolate, "f",
+                                          v8::kNormalString).unwrap();
+        context.Global().unwrap().Set(key, t.GetFunction().unwrap());
+        assert!(eval(isolate, "f(0)").unwrap().IsString());
+        assert!(eval(isolate, "f(1)").unwrap().IsNull());
+        assert!(eval(isolate, "f(2)").unwrap().IsUndefined());
+    });
+}
+
+fn eval(isolate: v8::Isolate, raw_source: &str) -> Option<v8::Value> {
+    let source = v8::String::NewFromUtf8(isolate, raw_source,
+                                         v8::kNormalString).unwrap();
+    let script = v8::Script::Compile(source, None).unwrap();
+    script.Run()
 }
 
 fn with_isolate_and_context(closure: |v8::Isolate, v8::Context|) {
