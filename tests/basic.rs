@@ -79,6 +79,16 @@ fn primitives() {
 }
 
 #[test]
+fn booleans() {
+    with_isolate_and_context(|isolate, _| {
+        assert!(v8::Boolean::New(isolate, true).unwrap().IsTrue());
+        assert!(v8::Boolean::New(isolate, false).unwrap().IsFalse());
+        assert!(v8::Boolean::New(isolate, true).unwrap().Value());
+        assert!(!v8::Boolean::New(isolate, false).unwrap().Value());
+    });
+}
+
+#[test]
 fn basic_number() {
     with_isolate_and_context(|isolate, _| {
         let val = 13.37;

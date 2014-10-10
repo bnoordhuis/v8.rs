@@ -362,7 +362,24 @@ macro_rules! value_methods(
 )
 
 #[repr(C)]
-pub struct ExtensionConfiguration;
+pub struct Boolean(*mut *mut Boolean);
+
+value_methods!(Boolean)
+
+impl Boolean {
+    // XXX(bnoordhuis) Never fails but returning Boolean
+    // directly is inconsistent with other New() methods.
+    pub fn New(isolate: Isolate, value: bool) -> Option<Boolean> {
+        Some(match value {
+            true => True(isolate),
+            false => False(isolate),
+        })
+    }
+
+    pub fn Value(&self) -> bool {
+        self.IsTrue()
+    }
+}
 
 #[repr(C)]
 pub struct CreateParams {
@@ -418,6 +435,9 @@ pub fn with_context_scope<T>(context: Context, closure: || -> T) -> T {
     context.Exit();
     rval
 }
+
+#[repr(C)]
+pub struct ExtensionConfiguration;
 
 #[repr(C)]
 pub struct Function(*mut *mut Function);
@@ -594,12 +614,12 @@ pub fn Undefined(isolate: Isolate) -> Primitive {
     GetRoot(Primitive, isolate, kUndefinedValueRootIndex)
 }
 
-pub fn True(isolate: Isolate) -> Primitive {
-    GetRoot(Primitive, isolate, kTrueValueRootIndex)
+pub fn True(isolate: Isolate) -> Boolean {
+    GetRoot(Boolean, isolate, kTrueValueRootIndex)
 }
 
-pub fn False(isolate: Isolate) -> Primitive {
-    GetRoot(Primitive, isolate, kFalseValueRootIndex)
+pub fn False(isolate: Isolate) -> Boolean {
+    GetRoot(Boolean, isolate, kFalseValueRootIndex)
 }
 
 fn GetRoot<T>(make: |*mut *mut T| -> T, isolate: Isolate, index: uint) -> T {
