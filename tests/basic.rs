@@ -180,6 +180,19 @@ fn return_values() {
     });
 }
 
+#[test]
+fn function_call() {
+    with_isolate_and_context(|isolate, _| {
+        let val = eval(isolate, "(function(x, y) { return x * y })").unwrap();
+        let fun: v8::Function = val.As();
+        let argv = [v8::Int32::New(isolate, 42).unwrap().As(),
+                    v8::Int32::New(isolate, 1337).unwrap().As()];
+        let result = fun.Call(v8::Null(isolate), &argv).unwrap();
+        assert!(result.IsNumber());
+        assert!(result.NumberValue() == 42. * 1337.);
+    });
+}
+
 fn eval(isolate: v8::Isolate, raw_source: &str) -> Option<v8::Value> {
     let source = v8::String::NewFromUtf8(isolate, raw_source,
                                          v8::kNormalString).unwrap();

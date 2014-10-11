@@ -32,6 +32,11 @@ extern {
     fn _ZN2v87Context3NewEPNS_7IsolateEPNS_22ExtensionConfigurationENS_6HandleINS_14ObjectTemplateEEENS5_INS_5ValueEEE(
             isolate: Isolate, extensions: *mut ExtensionConfiguration,
             global_template: ObjectTemplate, global_object: Value) -> Context;
+    fn _ZN2v88Function4CallENS_6HandleINS_5ValueEEEiPS3_(this: Function,
+                                                         recv: Value,
+                                                         argc: i32,
+                                                         argv: *const Value)
+                                                         -> Value;
     fn _ZNK2v820FunctionCallbackInfoINS_5ValueEE14GetReturnValueEv(
             this: FunctionCallbackInfo) -> ReturnValue;
     fn _ZNK2v820FunctionCallbackInfoINS_5ValueEEixEi(this: FunctionCallbackInfo,
@@ -127,6 +132,7 @@ extern {
 
 pub trait ValueT {
     fn as_val(&self) -> Value;
+    fn from_val(value: Value) -> Self;
 }
 
 macro_rules! data_methods(
@@ -352,6 +358,9 @@ macro_rules! value_methods(
             pub fn NumberValue(&self) -> f64 {
                 unsafe { _ZNK2v85Value11NumberValueEv(self.as_val()) }
             }
+            pub fn As<T: ValueT>(&self) -> T {
+                ValueT::from_val(self.as_val())
+            }
             #[inline(always)]
             fn as_val(&self) -> Value {
                 Value(unsafe { mem::transmute(*self) })
@@ -362,6 +371,12 @@ macro_rules! value_methods(
             #[inline(always)]
             fn as_val(&self) -> Value {
                 Value(unsafe { mem::transmute(*self) })
+            }
+            #[inline(always)]
+            fn from_val(value: Value) -> $ty {
+                match value {
+                    Value(that) => $ty(unsafe { mem::transmute(that) })
+                }
             }
         }
     );
@@ -449,6 +464,16 @@ pub struct ExtensionConfiguration;
 pub struct Function(*mut *mut Function);
 
 value_methods!(Function)
+
+impl Function {
+    pub fn Call<T: ValueT>(&self, recv: T, argv: &[Value]) -> Option<Value> {
+        unsafe {
+            _ZN2v88Function4CallENS_6HandleINS_5ValueEEEiPS3_(
+                    *self, recv.as_val(), argv.len() as i32,
+                    argv.as_slice().as_ptr())
+        }.to_option()
+    }
+}
 
 #[repr(C)]
 pub type FunctionCallback = extern fn(FunctionCallbackInfo);
