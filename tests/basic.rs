@@ -190,6 +190,11 @@ fn function_call() {
         let result = fun.Call(v8::Null(isolate), &argv).unwrap();
         assert!(result.IsNumber());
         assert!(result.NumberValue() == 42. * 1337.);
+        assert!(result.IntegerValue() == 42 * 1337);
+        assert!(result.IsUint32());
+        assert!(result.Uint32Value() == 42 * 1337);
+        assert!(result.IsInt32());
+        assert!(result.Int32Value() == 42 * 1337);
     });
 }
 

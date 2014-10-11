@@ -127,7 +127,10 @@ extern {
     fn _ZNK2v85Value9IsWeakSetEv(this: Value) -> bool;
     fn _ZNK2v85Value11QuickIsNullEv(this: Value) -> bool;
     fn _ZNK2v85Value16QuickIsUndefinedEv(this: Value) -> bool;
+    fn _ZNK2v85Value10Int32ValueEv(this: Value) -> i32;
     fn _ZNK2v85Value11NumberValueEv(this: Value) -> f64;
+    fn _ZNK2v85Value11Uint32ValueEv(this: Value) -> u32;
+    fn _ZNK2v85Value12IntegerValueEv(this: Value) -> i64;
 }
 
 pub trait ValueT {
@@ -355,8 +358,20 @@ macro_rules! value_methods(
                 unsafe { _ZNK2v85Value9IsWeakSetEv(self.as_val()) }
             }
             #[inline(always)]
+            pub fn Int32Value(&self) -> i32 {
+                unsafe { _ZNK2v85Value10Int32ValueEv(self.as_val()) }
+            }
+            #[inline(always)]
+            pub fn IntegerValue(&self) -> i64 {
+                unsafe { _ZNK2v85Value12IntegerValueEv(self.as_val()) }
+            }
+            #[inline(always)]
             pub fn NumberValue(&self) -> f64 {
                 unsafe { _ZNK2v85Value11NumberValueEv(self.as_val()) }
+            }
+            #[inline(always)]
+            pub fn Uint32Value(&self) -> u32 {
+                unsafe { _ZNK2v85Value11Uint32ValueEv(self.as_val()) }
             }
             pub fn As<T: ValueT>(&self) -> T {
                 ValueT::from_val(self.as_val())
