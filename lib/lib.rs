@@ -9,20 +9,20 @@ use std::fmt;
 use std::mem;
 use std::ptr;
 
-#[cfg(target_word_size="32")] static kApiPointerSize: uint = 4;
-#[cfg(target_word_size="64")] static kApiPointerSize: uint = 8;
-static kApiInt64Size: uint = 8;
-static kAmountOfExternalAllocatedMemoryOffset: uint = 4 * kApiPointerSize;
-static kAmountOfExternalAllocatedMemoryAtLastGlobalGCOffset: uint =
+#[cfg(target_word_size="32")] const kApiPointerSize: uint = 4;
+#[cfg(target_word_size="64")] const kApiPointerSize: uint = 8;
+const kApiInt64Size: uint = 8;
+const kAmountOfExternalAllocatedMemoryOffset: uint = 4 * kApiPointerSize;
+const kAmountOfExternalAllocatedMemoryAtLastGlobalGCOffset: uint =
         kAmountOfExternalAllocatedMemoryOffset + kApiInt64Size;
-static kIsolateRootsOffset: uint =
+const kIsolateRootsOffset: uint =
         kAmountOfExternalAllocatedMemoryAtLastGlobalGCOffset + kApiInt64Size +
         kApiPointerSize;
-static kUndefinedValueRootIndex: uint = 5;
-static kNullValueRootIndex: uint = 7;
-static kTrueValueRootIndex: uint = 8;
-static kFalseValueRootIndex: uint = 9;
-static kEmptyStringRootIndex: uint = 152;
+const kUndefinedValueRootIndex: uint = 5;
+const kNullValueRootIndex: uint = 7;
+const kTrueValueRootIndex: uint = 8;
+const kFalseValueRootIndex: uint = 9;
+const kEmptyStringRootIndex: uint = 152;
 
 #[link(name="v8")]
 extern {
