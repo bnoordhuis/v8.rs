@@ -67,9 +67,12 @@ extern {
     fn _ZN2v86Locker8IsLockedEPNS_7IsolateE(isolate: Isolate) -> bool;
     fn _ZN2v86LockerD1Ev(this: &mut Locker);
     fn _ZN2v86Number3NewEPNS_7IsolateEd(isolate: Isolate, value: f64) -> Number;
+    fn _ZN2v86Object3GetEj(this: Object, index: u32) -> Value;
     fn _ZN2v86Object3GetENS_6HandleINS_5ValueEEE(this: Object,
                                                  key: Value) -> Value;
     fn _ZN2v86Object3NewEPNS_7IsolateE(isolate: Isolate) -> Object;
+    fn _ZN2v86Object3SetEjNS_6HandleINS_5ValueEEE(this: Object, key: u32,
+                                                  value: Value) -> bool;
     fn _ZN2v86Object3SetENS_6HandleINS_5ValueEEES3_(this: Object, key: Value,
                                                     value: Value) -> bool;
     fn _ZN2v86Script7CompileENS_6HandleINS_6StringEEEPNS_12ScriptOriginE(
@@ -133,7 +136,12 @@ extern {
     fn _ZNK2v85Value12IntegerValueEv(this: Value) -> i64;
 }
 
-pub trait ValueT {
+pub trait IndexT {
+    fn get(&self, object: Object) -> Value;
+    fn set(&self, object: Object, value: Value) -> bool;
+}
+
+pub trait ValueT : IndexT {
     fn as_val(&self) -> Value;
     fn from_val(value: Value) -> Self;
 }
@@ -142,16 +150,17 @@ macro_rules! data_methods(
     ($ty:ident) => (
         impl $ty {
             #[inline(always)]
-            fn raw_ptr(&self) -> *mut *mut $ty {
-                match *self { $ty(that) => that }
+            fn raw_ptr(&self) -> *mut $ty {
+                match *self {
+                    $ty(that) => unsafe { *that }
+                }
             }
 
             #[allow(dead_code)]
             fn to_option(&self) -> Option<$ty> {
-                if self.raw_ptr().is_null() {
-                    None
-                } else {
-                    Some(*self)
+                match *self {
+                    $ty(that) if that.is_null() => None,
+                    _ => Some(*self),
                 }
             }
         }
@@ -379,6 +388,22 @@ macro_rules! value_methods(
             #[inline(always)]
             fn as_val(&self) -> Value {
                 Value(unsafe { mem::transmute(*self) })
+            }
+        }
+
+        impl IndexT for $ty {
+            fn get(&self, object: Object) -> Value {
+                unsafe {
+                    _ZN2v86Object3GetENS_6HandleINS_5ValueEEE(
+                            object, self.as_val())
+                }
+            }
+
+            fn set(&self, object: Object, value: Value) -> bool {
+                unsafe {
+                    _ZN2v86Object3SetENS_6HandleINS_5ValueEEES3_(
+                            object, self.as_val(), value)
+                }
             }
         }
 
@@ -684,20 +709,27 @@ pub struct Object(*mut *mut Object);
 value_methods!(Object)
 
 impl Object {
-    pub fn Get<K: ValueT>(&self, key: K) -> Option<Value> {
-        unsafe {
-            _ZN2v86Object3GetENS_6HandleINS_5ValueEEE(*self, key.as_val())
-        }.to_option()
+    pub fn Get<K: IndexT>(&self, key: K) -> Option<Value> {
+        key.get(*self).to_option()
     }
 
     pub fn New(isolate: Isolate) -> Option<Object> {
         unsafe { _ZN2v86Object3NewEPNS_7IsolateE(isolate) }.to_option()
     }
 
-    pub fn Set<K: ValueT, V: ValueT>(&self, key: K, value: V) -> bool {
+    pub fn Set<K: IndexT, V: ValueT>(&self, key: K, value: V) -> bool {
+        key.set(*self, value.as_val())
+    }
+}
+
+impl IndexT for u32 {
+    fn get(&self, object: Object) -> Value {
+        unsafe { _ZN2v86Object3GetEj(object, *self) }
+    }
+
+    fn set(&self, object: Object, value: Value) -> bool {
         unsafe {
-            _ZN2v86Object3SetENS_6HandleINS_5ValueEEES3_(
-                    *self, key.as_val(), value.as_val())
+            _ZN2v86Object3SetEjNS_6HandleINS_5ValueEEE(object, *self, value)
         }
     }
 }

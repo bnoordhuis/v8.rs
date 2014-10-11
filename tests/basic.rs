@@ -124,6 +124,22 @@ fn basic_object() {
 }
 
 #[test]
+fn object_get_and_set() {
+    with_isolate_and_context(|isolate, _| {
+        let obj = v8::Object::New(isolate).unwrap();
+        let idx = 123 as u32;
+        let key = v8::String::NewFromUtf8(isolate, "the_key",
+                                          v8::kNormalString).unwrap();
+        let abc = v8::Object::New(isolate).unwrap();
+        let def = v8::Object::New(isolate).unwrap();
+        assert!(obj.Set(idx, abc));
+        assert!(obj.Set(key, def));
+        assert_eq!(obj.Get(idx).unwrap(), abc.As());
+        assert_eq!(obj.Get(key).unwrap(), def.As());
+    });
+}
+
+#[test]
 fn global_object() {
     with_isolate_and_context(|isolate, context| {
         let key = v8::String::NewFromUtf8(isolate, "Object",
