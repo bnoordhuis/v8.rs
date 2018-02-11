@@ -23,20 +23,18 @@ namespace v8 {
 namespace internal {
 
 // When running without a simulator we call the entry directly.
-#define CALL_GENERATED_CODE(entry, p0, p1, p2, p3, p4) \
+#define CALL_GENERATED_CODE(isolate, entry, p0, p1, p2, p3, p4) \
   entry(p0, p1, p2, p3, p4)
 
-typedef int (*mips_regexp_matcher)(String*, int, const byte*, const byte*,
-                                   void*, int*, int, Address, int, Isolate*);
-
+typedef int (*mips_regexp_matcher)(String*, int, const byte*, const byte*, int*,
+                                   int, Address, int, Isolate*);
 
 // Call the generated regexp code directly. The code at the entry address
 // should act as a function matching the type arm_regexp_matcher.
-// The fifth argument is a dummy that reserves the space used for
-// the return address added by the ExitFrame in native calls.
-#define CALL_GENERATED_REGEXP_CODE(entry, p0, p1, p2, p3, p4, p5, p6, p7, p8) \
-  (FUNCTION_CAST<mips_regexp_matcher>(entry)( \
-      p0, p1, p2, p3, NULL, p4, p5, p6, p7, p8))
+#define CALL_GENERATED_REGEXP_CODE(isolate, entry, p0, p1, p2, p3, p4, p5, p6, \
+                                   p7, p8)                                     \
+  (FUNCTION_CAST<mips_regexp_matcher>(entry)(p0, p1, p2, p3, p4, p5, p6, p7,   \
+                                             p8))
 
 // The stack limit beyond which we will throw stack overflow errors in
 // generated code. Because generated code on mips uses the C stack, we
@@ -48,14 +46,17 @@ class SimulatorStack : public v8::internal::AllStatic {
     return c_limit;
   }
 
-  static inline uintptr_t RegisterCTryCatch(uintptr_t try_catch_address) {
+  static inline uintptr_t RegisterCTryCatch(Isolate* isolate,
+                                            uintptr_t try_catch_address) {
+    USE(isolate);
     return try_catch_address;
   }
 
-  static inline void UnregisterCTryCatch() { }
+  static inline void UnregisterCTryCatch(Isolate* isolate) { USE(isolate); }
 };
 
-} }  // namespace v8::internal
+}  // namespace internal
+}  // namespace v8
 
 // Calculated the stack limit beyond which we will throw stack overflow errors.
 // This macro must be called from a C++ method. It relies on being able to take
@@ -71,7 +72,7 @@ class SimulatorStack : public v8::internal::AllStatic {
 // Running with a simulator.
 
 #include "src/assembler.h"
-#include "src/hashmap.h"
+#include "src/base/hashmap.h"
 
 namespace v8 {
 namespace internal {
@@ -107,6 +108,39 @@ class CachePage {
   char data_[kPageSize];   // The cached data.
   static const int kValidityMapSize = kPageSize >> kLineShift;
   char validity_map_[kValidityMapSize];  // One byte per line.
+};
+
+class SimInstructionBase : public InstructionBase {
+ public:
+  Type InstructionType() const { return type_; }
+  inline Instruction* instr() const { return instr_; }
+  inline int32_t operand() const { return operand_; }
+
+ protected:
+  SimInstructionBase() : operand_(-1), instr_(nullptr), type_(kUnsupported) {}
+  explicit SimInstructionBase(Instruction* instr) {}
+
+  int32_t operand_;
+  Instruction* instr_;
+  Type type_;
+
+ private:
+  DISALLOW_ASSIGN(SimInstructionBase);
+};
+
+class SimInstruction : public InstructionGetters<SimInstructionBase> {
+ public:
+  SimInstruction() {}
+
+  explicit SimInstruction(Instruction* instr) { *this = instr; }
+
+  SimInstruction& operator=(Instruction* instr) {
+    operand_ = *reinterpret_cast<const int32_t*>(instr);
+    instr_ = instr;
+    type_ = InstructionBase::InstructionType();
+    DCHECK(reinterpret_cast<void*>(&operand_) == this);
+    return *this;
+  }
 };
 
 class Simulator {
@@ -147,6 +181,43 @@ class Simulator {
     kNumFPURegisters
   };
 
+  // MSA registers
+  enum MSARegister {
+    w0,
+    w1,
+    w2,
+    w3,
+    w4,
+    w5,
+    w6,
+    w7,
+    w8,
+    w9,
+    w10,
+    w11,
+    w12,
+    w13,
+    w14,
+    w15,
+    w16,
+    w17,
+    w18,
+    w19,
+    w20,
+    w21,
+    w22,
+    w23,
+    w24,
+    w25,
+    w26,
+    w27,
+    w28,
+    w29,
+    w30,
+    w31,
+    kNumMSARegisters
+  };
+
   explicit Simulator(Isolate* isolate);
   ~Simulator();
 
@@ -167,32 +238,60 @@ class Simulator {
   void set_fpu_register_hi_word(int fpureg, int32_t value);
   void set_fpu_register_float(int fpureg, float value);
   void set_fpu_register_double(int fpureg, double value);
+  void set_fpu_register_invalid_result64(float original, float rounded);
+  void set_fpu_register_invalid_result(float original, float rounded);
+  void set_fpu_register_word_invalid_result(float original, float rounded);
+  void set_fpu_register_invalid_result64(double original, double rounded);
+  void set_fpu_register_invalid_result(double original, double rounded);
+  void set_fpu_register_word_invalid_result(double original, double rounded);
   int64_t get_fpu_register(int fpureg) const;
   int32_t get_fpu_register_word(int fpureg) const;
   int32_t get_fpu_register_signed_word(int fpureg) const;
   int32_t get_fpu_register_hi_word(int fpureg) const;
   float get_fpu_register_float(int fpureg) const;
   double get_fpu_register_double(int fpureg) const;
+  template <typename T>
+  void get_msa_register(int wreg, T* value);
+  template <typename T>
+  void set_msa_register(int wreg, const T* value);
   void set_fcsr_bit(uint32_t cc, bool value);
   bool test_fcsr_bit(uint32_t cc);
+  void set_fcsr_rounding_mode(FPURoundingMode mode);
+  void set_msacsr_rounding_mode(FPURoundingMode mode);
+  unsigned int get_fcsr_rounding_mode();
+  unsigned int get_msacsr_rounding_mode();
   bool set_fcsr_round_error(double original, double rounded);
-
+  bool set_fcsr_round_error(float original, float rounded);
+  bool set_fcsr_round64_error(double original, double rounded);
+  bool set_fcsr_round64_error(float original, float rounded);
+  void round_according_to_fcsr(double toRound, double& rounded,
+                               int32_t& rounded_int, double fs);
+  void round_according_to_fcsr(float toRound, float& rounded,
+                               int32_t& rounded_int, float fs);
+  template <typename Tfp, typename Tint>
+  void round_according_to_msacsr(Tfp toRound, Tfp& rounded, Tint& rounded_int);
+  void round64_according_to_fcsr(double toRound, double& rounded,
+                                 int64_t& rounded_int, double fs);
+  void round64_according_to_fcsr(float toRound, float& rounded,
+                                 int64_t& rounded_int, float fs);
   // Special case of set_register and get_register to access the raw PC value.
   void set_pc(int32_t value);
   int32_t get_pc() const;
 
-  Address get_sp() {
+  Address get_sp() const {
     return reinterpret_cast<Address>(static_cast<intptr_t>(get_register(sp)));
   }
 
   // Accessor to the internal simulator stack area.
-  uintptr_t StackLimit() const;
+  uintptr_t StackLimit(uintptr_t c_limit) const;
 
   // Executes MIPS instructions until the PC reaches end_sim_pc.
   void Execute();
 
   // Call on program start.
   static void Initialize(Isolate* isolate);
+
+  static void TearDown(base::CustomMatcherHashMap* i_cache, Redirection* first);
 
   // V8 generally calls into generated JS code with 5 parameters and into
   // generated RegExp code with 7 parameters. This is a convenience function,
@@ -212,7 +311,7 @@ class Simulator {
   char* last_debugger_input() { return last_debugger_input_; }
 
   // ICache checking.
-  static void FlushICache(v8::internal::HashMap* i_cache, void* start,
+  static void FlushICache(base::CustomMatcherHashMap* i_cache, void* start,
                           size_t size);
 
   // Returns true if pc register contains one of the 'special_values' defined
@@ -236,6 +335,22 @@ class Simulator {
   // Unsupported instructions use Format to print an error and stop execution.
   void Format(Instruction* instr, const char* format);
 
+  // Helpers for data value tracing.
+  enum TraceType { BYTE, HALF, WORD, DWORD, FLOAT, DOUBLE, FLOAT_DOUBLE };
+
+  // MSA Data Format
+  enum MSADataFormat { MSA_VECT = 0, MSA_BYTE, MSA_HALF, MSA_WORD, MSA_DWORD };
+  typedef union {
+    int8_t b[kMSALanesByte];
+    uint8_t ub[kMSALanesByte];
+    int16_t h[kMSALanesHalf];
+    uint16_t uh[kMSALanesHalf];
+    int32_t w[kMSALanesWord];
+    uint32_t uw[kMSALanesWord];
+    int64_t d[kMSALanesDword];
+    uint64_t ud[kMSALanesDword];
+  } msa_reg_t;
+
   // Read and write memory.
   inline uint32_t ReadBU(int32_t addr);
   inline int32_t ReadB(int32_t addr);
@@ -248,11 +363,33 @@ class Simulator {
   inline void WriteH(int32_t addr, uint16_t value, Instruction* instr);
   inline void WriteH(int32_t addr, int16_t value, Instruction* instr);
 
-  inline int ReadW(int32_t addr, Instruction* instr);
+  inline int ReadW(int32_t addr, Instruction* instr, TraceType t = WORD);
   inline void WriteW(int32_t addr, int value, Instruction* instr);
 
   inline double ReadD(int32_t addr, Instruction* instr);
   inline void WriteD(int32_t addr, double value, Instruction* instr);
+
+  template <typename T>
+  T ReadMem(int32_t addr, Instruction* instr);
+
+  template <typename T>
+  void WriteMem(int32_t addr, T value, Instruction* instr);
+
+  void TraceRegWr(int32_t value, TraceType t = WORD);
+  void TraceRegWr(int64_t value, TraceType t = DWORD);
+  template <typename T>
+  void TraceMSARegWr(T* value, TraceType t);
+  template <typename T>
+  void TraceMSARegWr(T* value);
+  void TraceMemWr(int32_t addr, int32_t value, TraceType t = WORD);
+  void TraceMemRd(int32_t addr, int32_t value, TraceType t = WORD);
+  void TraceMemWr(int32_t addr, int64_t value, TraceType t = DWORD);
+  void TraceMemRd(int32_t addr, int64_t value, TraceType t = DWORD);
+  template <typename T>
+  void TraceMemRd(int32_t addr, T value);
+  template <typename T>
+  void TraceMemWr(int32_t addr, T value);
+  EmbeddedVector<char, 128> trace_buf_;
 
   // Operations depending on endianness.
   // Get Double Higher / Lower word.
@@ -262,23 +399,113 @@ class Simulator {
   inline int32_t SetDoubleHIW(double* addr);
   inline int32_t SetDoubleLOW(double* addr);
 
+  SimInstruction instr_;
+
   // Executing is handled based on the instruction type.
-  void DecodeTypeRegister(Instruction* instr);
+  void DecodeTypeRegister();
 
-  // Helper function for DecodeTypeRegister.
-  void ConfigureTypeRegister(Instruction* instr,
-                             int32_t* alu_out,
-                             int64_t* i64hilo,
-                             uint64_t* u64hilo,
-                             int32_t* next_pc,
-                             int32_t* return_addr_reg,
-                             bool* do_interrupt);
+  // Functions called from DecodeTypeRegister.
+  void DecodeTypeRegisterCOP1();
 
-  void DecodeTypeImmediate(Instruction* instr);
-  void DecodeTypeJump(Instruction* instr);
+  void DecodeTypeRegisterCOP1X();
+
+  void DecodeTypeRegisterSPECIAL();
+
+  void DecodeTypeRegisterSPECIAL2();
+
+  void DecodeTypeRegisterSPECIAL3();
+
+  // Called from DecodeTypeRegisterCOP1.
+  void DecodeTypeRegisterSRsType();
+
+  void DecodeTypeRegisterDRsType();
+
+  void DecodeTypeRegisterWRsType();
+
+  void DecodeTypeRegisterLRsType();
+
+  int DecodeMsaDataFormat();
+  void DecodeTypeMsaI8();
+  void DecodeTypeMsaI5();
+  void DecodeTypeMsaI10();
+  void DecodeTypeMsaELM();
+  void DecodeTypeMsaBIT();
+  void DecodeTypeMsaMI10();
+  void DecodeTypeMsa3R();
+  void DecodeTypeMsa3RF();
+  void DecodeTypeMsaVec();
+  void DecodeTypeMsa2R();
+  void DecodeTypeMsa2RF();
+  template <typename T>
+  T MsaI5InstrHelper(uint32_t opcode, T ws, int32_t i5);
+  template <typename T>
+  T MsaBitInstrHelper(uint32_t opcode, T wd, T ws, int32_t m);
+  template <typename T>
+  T Msa3RInstrHelper(uint32_t opcode, T wd, T ws, T wt);
+
+  inline int32_t rs_reg() const { return instr_.RsValue(); }
+  inline int32_t rs() const { return get_register(rs_reg()); }
+  inline uint32_t rs_u() const {
+    return static_cast<uint32_t>(get_register(rs_reg()));
+  }
+  inline int32_t rt_reg() const { return instr_.RtValue(); }
+  inline int32_t rt() const { return get_register(rt_reg()); }
+  inline uint32_t rt_u() const {
+    return static_cast<uint32_t>(get_register(rt_reg()));
+  }
+  inline int32_t rd_reg() const { return instr_.RdValue(); }
+  inline int32_t fr_reg() const { return instr_.FrValue(); }
+  inline int32_t fs_reg() const { return instr_.FsValue(); }
+  inline int32_t ft_reg() const { return instr_.FtValue(); }
+  inline int32_t fd_reg() const { return instr_.FdValue(); }
+  inline int32_t sa() const { return instr_.SaValue(); }
+  inline int32_t lsa_sa() const { return instr_.LsaSaValue(); }
+  inline int32_t ws_reg() const { return instr_.WsValue(); }
+  inline int32_t wt_reg() const { return instr_.WtValue(); }
+  inline int32_t wd_reg() const { return instr_.WdValue(); }
+
+  inline void SetResult(int32_t rd_reg, int32_t alu_out) {
+    set_register(rd_reg, alu_out);
+    TraceRegWr(alu_out);
+  }
+
+  inline void SetFPUWordResult(int32_t fd_reg, int32_t alu_out) {
+    set_fpu_register_word(fd_reg, alu_out);
+    TraceRegWr(get_fpu_register_word(fd_reg));
+  }
+
+  inline void SetFPUResult(int32_t fd_reg, int64_t alu_out) {
+    set_fpu_register(fd_reg, alu_out);
+    TraceRegWr(get_fpu_register(fd_reg));
+  }
+
+  inline void SetFPUFloatResult(int32_t fd_reg, float alu_out) {
+    set_fpu_register_float(fd_reg, alu_out);
+    TraceRegWr(get_fpu_register_word(fd_reg), FLOAT);
+  }
+
+  inline void SetFPUDoubleResult(int32_t fd_reg, double alu_out) {
+    set_fpu_register_double(fd_reg, alu_out);
+    TraceRegWr(get_fpu_register(fd_reg), DOUBLE);
+  }
+
+  void DecodeTypeImmediate();
+  void DecodeTypeJump();
 
   // Used for breakpoints and traps.
-  void SoftwareInterrupt(Instruction* instr);
+  void SoftwareInterrupt();
+
+  // Compact branch guard.
+  void CheckForbiddenSlot(int32_t current_pc) {
+    Instruction* instr_after_compact_branch =
+        reinterpret_cast<Instruction*>(current_pc + Instruction::kInstrSize);
+    if (instr_after_compact_branch->IsForbiddenAfterBranch()) {
+      V8_Fatal(__FILE__, __LINE__,
+               "Error: Unexpected instruction 0x%08x immediately after a "
+               "compact branch instruction.",
+               *reinterpret_cast<uint32_t*>(instr_after_compact_branch));
+    }
+  }
 
   // Stop helper functions.
   bool IsWatchpoint(uint32_t code);
@@ -308,13 +535,16 @@ class Simulator {
                instr->OpcodeValue());
     }
     InstructionDecode(instr);
+    SNPrintF(trace_buf_, " ");
   }
 
   // ICache.
-  static void CheckICache(v8::internal::HashMap* i_cache, Instruction* instr);
-  static void FlushOnePage(v8::internal::HashMap* i_cache, intptr_t start,
+  static void CheckICache(base::CustomMatcherHashMap* i_cache,
+                          Instruction* instr);
+  static void FlushOnePage(base::CustomMatcherHashMap* i_cache, intptr_t start,
                            int size);
-  static CachePage* GetCachePage(v8::internal::HashMap* i_cache, void* page);
+  static CachePage* GetCachePage(base::CustomMatcherHashMap* i_cache,
+                                 void* page);
 
   enum Exception {
     none,
@@ -323,13 +553,13 @@ class Simulator {
     kDivideByZero,
     kNumExceptions
   };
-  int16_t exceptions[kNumExceptions];
 
   // Exceptions.
-  void SignalExceptions();
+  void SignalException(Exception e);
 
-  // Runtime call support.
-  static void* RedirectExternalReference(void* external_function,
+  // Runtime call support. Uses the isolate in a thread-safe way.
+  static void* RedirectExternalReference(Isolate* isolate,
+                                         void* external_function,
                                          ExternalReference::Type type);
 
   // Handle arguments and return value for runtime FP functions.
@@ -344,23 +574,27 @@ class Simulator {
   // Coprocessor Registers.
   // Note: FP32 mode uses only the lower 32-bit part of each element,
   // the upper 32-bit is unpredictable.
-  int64_t FPUregisters_[kNumFPURegisters];
+  // Note: FPUregisters_[] array is increased to 64 * 8B = 32 * 16B in
+  // order to support MSA registers
+  int64_t FPUregisters_[kNumFPURegisters * 2];
   // FPU control register.
   uint32_t FCSR_;
+  // MSA control register.
+  uint32_t MSACSR_;
 
   // Simulator support.
   // Allocate 1MB for stack.
   static const size_t stack_size_ = 1 * 1024*1024;
   char* stack_;
   bool pc_modified_;
-  int icount_;
+  uint64_t icount_;
   int break_count_;
 
   // Debugger input.
   char* last_debugger_input_;
 
   // Icache simulation.
-  v8::internal::HashMap* i_cache_;
+  base::CustomMatcherHashMap* i_cache_;
 
   v8::internal::Isolate* isolate_;
 
@@ -385,38 +619,39 @@ class Simulator {
 
 // When running with the simulator transition into simulated execution at this
 // point.
-#define CALL_GENERATED_CODE(entry, p0, p1, p2, p3, p4) \
-    reinterpret_cast<Object*>(Simulator::current(Isolate::Current())->Call( \
+#define CALL_GENERATED_CODE(isolate, entry, p0, p1, p2, p3, p4) \
+  reinterpret_cast<Object*>(Simulator::current(isolate)->Call(  \
       FUNCTION_ADDR(entry), 5, p0, p1, p2, p3, p4))
 
-#define CALL_GENERATED_REGEXP_CODE(entry, p0, p1, p2, p3, p4, p5, p6, p7, p8) \
-    Simulator::current(Isolate::Current())->Call( \
-        entry, 10, p0, p1, p2, p3, NULL, p4, p5, p6, p7, p8)
-
+#define CALL_GENERATED_REGEXP_CODE(isolate, entry, p0, p1, p2, p3, p4, p5, p6, \
+                                   p7, p8)                                     \
+  Simulator::current(isolate)->Call(entry, 9, p0, p1, p2, p3, p4, p5, p6, p7,  \
+                                    p8)
 
 // The simulator has its own stack. Thus it has a different stack limit from
-// the C-based native code.  Setting the c_limit to indicate a very small
-// stack cause stack overflow errors, since the simulator ignores the input.
-// This is unlikely to be an issue in practice, though it might cause testing
-// trouble down the line.
+// the C-based native code.  The JS-based limit normally points near the end of
+// the simulator stack.  When the C-based limit is exhausted we reflect that by
+// lowering the JS-based limit as well, to make stack checks trigger.
 class SimulatorStack : public v8::internal::AllStatic {
  public:
   static inline uintptr_t JsLimitFromCLimit(Isolate* isolate,
                                             uintptr_t c_limit) {
-    return Simulator::current(isolate)->StackLimit();
+    return Simulator::current(isolate)->StackLimit(c_limit);
   }
 
-  static inline uintptr_t RegisterCTryCatch(uintptr_t try_catch_address) {
-    Simulator* sim = Simulator::current(Isolate::Current());
+  static inline uintptr_t RegisterCTryCatch(Isolate* isolate,
+                                            uintptr_t try_catch_address) {
+    Simulator* sim = Simulator::current(isolate);
     return sim->PushAddress(try_catch_address);
   }
 
-  static inline void UnregisterCTryCatch() {
-    Simulator::current(Isolate::Current())->PopAddress();
+  static inline void UnregisterCTryCatch(Isolate* isolate) {
+    Simulator::current(isolate)->PopAddress();
   }
 };
 
-} }  // namespace v8::internal
+}  // namespace internal
+}  // namespace v8
 
 #endif  // !defined(USE_SIMULATOR)
 #endif  // V8_MIPS_SIMULATOR_MIPS_H_

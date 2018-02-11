@@ -5,55 +5,64 @@
 #ifndef V8_COMPILER_TYPER_H_
 #define V8_COMPILER_TYPER_H_
 
-#include "src/v8.h"
-
 #include "src/compiler/graph.h"
-#include "src/compiler/opcodes.h"
-#include "src/types.h"
+#include "src/compiler/operation-typer.h"
+#include "src/globals.h"
 
 namespace v8 {
 namespace internal {
 namespace compiler {
 
-class Typer {
+// Forward declarations.
+class LoopVariableOptimizer;
+
+class V8_EXPORT_PRIVATE Typer {
  public:
-  explicit Typer(Zone* zone);
+  enum Flag : uint8_t {
+    kNoFlags = 0,
+    kThisIsReceiver = 1u << 0,       // Parameter this is an Object.
+    kNewTargetIsReceiver = 1u << 1,  // Parameter new.target is an Object.
+  };
+  typedef base::Flags<Flag> Flags;
 
-  void Init(Node* node);
-  void Run(Graph* graph, MaybeHandle<Context> context);
-  void Narrow(Graph* graph, Node* node, MaybeHandle<Context> context);
-  void Widen(Graph* graph, Node* node, MaybeHandle<Context> context);
+  Typer(Isolate* isolate, Flags flags, Graph* graph);
+  ~Typer();
 
-  void DecorateGraph(Graph* graph);
-
-  Zone* zone() { return zone_; }
-  Isolate* isolate() { return zone_->isolate(); }
+  void Run();
+  // TODO(bmeurer,jarin): Remove this once we have a notion of "roots" on Graph.
+  void Run(const ZoneVector<Node*>& roots,
+           LoopVariableOptimizer* induction_vars);
 
  private:
   class Visitor;
-  class RunVisitor;
-  class NarrowVisitor;
-  class WidenVisitor;
+  class Decorator;
 
-  Zone* zone_;
-  Type* number_fun0_;
-  Type* number_fun1_;
-  Type* number_fun2_;
-  Type* weakint_fun1_;
-  Type* imul_fun_;
-  Type* random_fun_;
-  Type* array_buffer_fun_;
-  Type* int8_array_fun_;
-  Type* int16_array_fun_;
-  Type* int32_array_fun_;
-  Type* uint8_array_fun_;
-  Type* uint16_array_fun_;
-  Type* uint32_array_fun_;
-  Type* float32_array_fun_;
-  Type* float64_array_fun_;
+  Flags flags() const { return flags_; }
+  Graph* graph() const { return graph_; }
+  Zone* zone() const { return graph()->zone(); }
+  Isolate* isolate() const { return isolate_; }
+  OperationTyper* operation_typer() { return &operation_typer_; }
+
+  Isolate* const isolate_;
+  Flags const flags_;
+  Graph* const graph_;
+  Decorator* decorator_;
+  TypeCache const& cache_;
+  OperationTyper operation_typer_;
+
+  Type* singleton_empty_string_;
+  Type* singleton_false_;
+  Type* singleton_true_;
+  Type* falsish_;
+  Type* truish_;
+
+  DISALLOW_COPY_AND_ASSIGN(Typer);
 };
-}
-}
-}  // namespace v8::internal::compiler
+
+DEFINE_OPERATORS_FOR_FLAGS(Typer::Flags);
+
+}  // namespace compiler
+}  // namespace internal
+}  // namespace v8
 
 #endif  // V8_COMPILER_TYPER_H_

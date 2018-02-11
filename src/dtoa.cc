@@ -4,7 +4,6 @@
 
 #include <cmath>
 
-#include "include/v8stdint.h"
 #include "src/base/logging.h"
 #include "src/utils.h"
 
@@ -25,7 +24,6 @@ static BignumDtoaMode DtoaToBignumDtoaMode(DtoaMode dtoa_mode) {
     case DTOA_PRECISION: return BIGNUM_DTOA_PRECISION;
     default:
       UNREACHABLE();
-      return BIGNUM_DTOA_SHORTEST;  // To silence compiler.
   }
 }
 
@@ -70,7 +68,6 @@ void DoubleToAscii(double v, DtoaMode mode, int requested_digits,
       break;
     default:
       UNREACHABLE();
-      fast_worked = false;
   }
   if (fast_worked) return;
 
@@ -80,4 +77,5 @@ void DoubleToAscii(double v, DtoaMode mode, int requested_digits,
   buffer[*length] = '\0';
 }
 
-} }  // namespace v8::internal
+}  // namespace internal
+}  // namespace v8

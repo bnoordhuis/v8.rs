@@ -15,9 +15,7 @@
 #endif  // MINGW_HAS_SECURE_API
 #endif  // __MINGW32__
 
-#ifdef _MSC_VER
 #include <limits>
-#endif
 
 #include "src/base/win32-headers.h"
 
@@ -26,18 +24,8 @@
 #include "src/base/macros.h"
 #include "src/base/platform/platform.h"
 #include "src/base/platform/time.h"
+#include "src/base/timezone-cache.h"
 #include "src/base/utils/random-number-generator.h"
-
-#ifdef _MSC_VER
-
-// Case-insensitive bounded string comparisons. Use stricmp() on Win32. Usually
-// defined in strings.h.
-int strncasecmp(const char* s1, const char* s2, int n) {
-  return _strnicmp(s1, s2, n);
-}
-
-#endif  // _MSC_VER
-
 
 // Extra functions for MinGW. Most of these are the _s functions which are in
 // the Microsoft Visual Studio C++ CRT.
@@ -49,7 +37,7 @@ int strncasecmp(const char* s1, const char* s2, int n) {
 #define _TRUNCATE 0
 #define STRUNCATE 80
 
-inline void MemoryBarrier() {
+inline void MemoryFence() {
   int barrier = 0;
   __asm__ __volatile__("xchgl %%eax,%0 ":"=r" (barrier));
 }
@@ -58,16 +46,15 @@ inline void MemoryBarrier() {
 
 
 int localtime_s(tm* out_tm, const time_t* time) {
-  tm* posix_local_time_struct = localtime(time);
-  if (posix_local_time_struct == NULL) return 1;
-  *out_tm = *posix_local_time_struct;
+  tm* posix_local_time_struct = localtime_r(time, out_tm);
+  if (posix_local_time_struct == nullptr) return 1;
   return 0;
 }
 
 
 int fopen_s(FILE** pFile, const char* filename, const char* mode) {
   *pFile = fopen(filename, mode);
-  return *pFile != NULL ? 0 : 1;
+  return *pFile != nullptr ? 0 : 1;
 }
 
 int _vsnprintf_s(char* buffer, size_t sizeOfBuffer, size_t count,
@@ -78,8 +65,8 @@ int _vsnprintf_s(char* buffer, size_t sizeOfBuffer, size_t count,
 
 
 int strncpy_s(char* dest, size_t dest_size, const char* source, size_t count) {
-  CHECK(source != NULL);
-  CHECK(dest != NULL);
+  CHECK(source != nullptr);
+  CHECK(dest != nullptr);
   CHECK_GT(dest_size, 0);
 
   if (count == _TRUNCATE) {
@@ -114,13 +101,19 @@ bool g_hard_abort = false;
 
 }  // namespace
 
-class TimezoneCache {
+class WindowsTimezoneCache : public TimezoneCache {
  public:
-  TimezoneCache() : initialized_(false) { }
+  WindowsTimezoneCache() : initialized_(false) {}
 
-  void Clear() {
-    initialized_ = false;
-  }
+  ~WindowsTimezoneCache() override {}
+
+  void Clear() override { initialized_ = false; }
+
+  const char* LocalTimezone(double time) override;
+
+  double LocalTimeOffset() override;
+
+  double DaylightSavingsOffset(double time) override;
 
   // Initialize timezone information. The timezone information is obtained from
   // windows. If we cannot get the timezone information we fall back to CET.
@@ -146,11 +139,11 @@ class TimezoneCache {
     }
 
     // Make standard and DST timezone names.
-    WideCharToMultiByte(CP_UTF8, 0, tzinfo_.StandardName, -1,
-                        std_tz_name_, kTzNameSize, NULL, NULL);
+    WideCharToMultiByte(CP_UTF8, 0, tzinfo_.StandardName, -1, std_tz_name_,
+                        kTzNameSize, nullptr, nullptr);
     std_tz_name_[kTzNameSize - 1] = '\0';
-    WideCharToMultiByte(CP_UTF8, 0, tzinfo_.DaylightName, -1,
-                        dst_tz_name_, kTzNameSize, NULL, NULL);
+    WideCharToMultiByte(CP_UTF8, 0, tzinfo_.DaylightName, -1, dst_tz_name_,
+                        kTzNameSize, nullptr, nullptr);
     dst_tz_name_[kTzNameSize - 1] = '\0';
 
     // If OS returned empty string or resource id (like "@tzres.dll,-211")
@@ -229,14 +222,14 @@ class Win32Time {
   // LocalOffset(CET) = 3600000 and LocalOffset(PST) = -28800000. This
   // routine also takes into account whether daylight saving is effect
   // at the time.
-  int64_t LocalOffset(TimezoneCache* cache);
+  int64_t LocalOffset(WindowsTimezoneCache* cache);
 
   // Returns the daylight savings time offset for the time in milliseconds.
-  int64_t DaylightSavingsOffset(TimezoneCache* cache);
+  int64_t DaylightSavingsOffset(WindowsTimezoneCache* cache);
 
   // Returns a string identifying the current timezone for the
   // timestamp taking into account daylight saving.
-  char* LocalTimezone(TimezoneCache* cache);
+  char* LocalTimezone(WindowsTimezoneCache* cache);
 
  private:
   // Constants for time conversion.
@@ -248,7 +241,7 @@ class Win32Time {
   static const bool kShortTzNames = false;
 
   // Return whether or not daylight savings time is in effect at this time.
-  bool InDST(TimezoneCache* cache);
+  bool InDST(WindowsTimezoneCache* cache);
 
   // Accessor for FILETIME representation.
   FILETIME& ft() { return time_.ft_; }
@@ -363,12 +356,12 @@ void Win32Time::SetToCurrentTime() {
 // Only times in the 32-bit Unix range may be passed to this function.
 // Also, adding the time-zone offset to the input must not overflow.
 // The function EquivalentTime() in date.js guarantees this.
-int64_t Win32Time::LocalOffset(TimezoneCache* cache) {
+int64_t Win32Time::LocalOffset(WindowsTimezoneCache* cache) {
   cache->InitializeIfNeeded();
 
   Win32Time rounded_to_second(*this);
-  rounded_to_second.t() = rounded_to_second.t() / 1000 / kTimeScaler *
-      1000 * kTimeScaler;
+  rounded_to_second.t() =
+      rounded_to_second.t() / 1000 / kTimeScaler * 1000 * kTimeScaler;
   // Convert to local time using POSIX localtime function.
   // Windows XP Service Pack 3 made SystemTimeToTzSpecificLocalTime()
   // very slow.  Other browsers use localtime().
@@ -397,7 +390,7 @@ int64_t Win32Time::LocalOffset(TimezoneCache* cache) {
 
 
 // Return whether or not daylight savings time is in effect at this time.
-bool Win32Time::InDST(TimezoneCache* cache) {
+bool Win32Time::InDST(WindowsTimezoneCache* cache) {
   cache->InitializeIfNeeded();
 
   // Determine if DST is in effect at the specified time.
@@ -422,14 +415,14 @@ bool Win32Time::InDST(TimezoneCache* cache) {
 
 
 // Return the daylight savings time offset for this time.
-int64_t Win32Time::DaylightSavingsOffset(TimezoneCache* cache) {
+int64_t Win32Time::DaylightSavingsOffset(WindowsTimezoneCache* cache) {
   return InDST(cache) ? 60 * kMsPerMinute : 0;
 }
 
 
 // Returns a string identifying the current timezone for the
 // timestamp taking into account daylight saving.
-char* Win32Time::LocalTimezone(TimezoneCache* cache) {
+char* Win32Time::LocalTimezone(WindowsTimezoneCache* cache) {
   // Return the standard or DST time zone name based on whether daylight
   // saving is in effect at the given time.
   return InDST(cache) ? cache->dst_tz_name_ : cache->std_tz_name_;
@@ -461,47 +454,30 @@ double OS::TimeCurrentMillis() {
   return Time::Now().ToJsTime();
 }
 
-
-TimezoneCache* OS::CreateTimezoneCache() {
-  return new TimezoneCache();
-}
-
-
-void OS::DisposeTimezoneCache(TimezoneCache* cache) {
-  delete cache;
-}
-
-
-void OS::ClearTimezoneCache(TimezoneCache* cache) {
-  cache->Clear();
-}
-
-
 // Returns a string identifying the current timezone taking into
 // account daylight saving.
-const char* OS::LocalTimezone(double time, TimezoneCache* cache) {
-  return Win32Time(time).LocalTimezone(cache);
+const char* WindowsTimezoneCache::LocalTimezone(double time) {
+  return Win32Time(time).LocalTimezone(this);
 }
-
 
 // Returns the local time offset in milliseconds east of UTC without
 // taking daylight savings time into account.
-double OS::LocalTimeOffset(TimezoneCache* cache) {
+double WindowsTimezoneCache::LocalTimeOffset() {
   // Use current time, rounded to the millisecond.
-  Win32Time t(TimeCurrentMillis());
+  Win32Time t(OS::TimeCurrentMillis());
   // Time::LocalOffset inlcudes any daylight savings offset, so subtract it.
-  return static_cast<double>(t.LocalOffset(cache) -
-                             t.DaylightSavingsOffset(cache));
+  return static_cast<double>(t.LocalOffset(this) -
+                             t.DaylightSavingsOffset(this));
 }
-
 
 // Returns the daylight savings offset in milliseconds for the given
 // time.
-double OS::DaylightSavingsOffset(double time, TimezoneCache* cache) {
-  int64_t offset = Win32Time(time).DaylightSavingsOffset(cache);
+double WindowsTimezoneCache::DaylightSavingsOffset(double time) {
+  int64_t offset = Win32Time(time).DaylightSavingsOffset(this);
   return static_cast<double>(offset);
 }
 
+TimezoneCache* OS::CreateTimezoneCache() { return new WindowsTimezoneCache(); }
 
 int OS::GetLastError() {
   return ::GetLastError();
@@ -577,7 +553,7 @@ FILE* OS::FOpen(const char* path, const char* mode) {
   if (fopen_s(&result, path, mode) == 0) {
     return result;
   } else {
-    return NULL;
+    return nullptr;
   }
 }
 
@@ -586,19 +562,25 @@ bool OS::Remove(const char* path) {
   return (DeleteFileA(path) != 0);
 }
 
+char OS::DirectorySeparator() { return '\\'; }
+
+bool OS::isDirectorySeparator(const char ch) {
+  return ch == '/' || ch == '\\';
+}
+
 
 FILE* OS::OpenTemporaryFile() {
   // tmpfile_s tries to use the root dir, don't use it.
   char tempPathBuffer[MAX_PATH];
   DWORD path_result = 0;
   path_result = GetTempPathA(MAX_PATH, tempPathBuffer);
-  if (path_result > MAX_PATH || path_result == 0) return NULL;
+  if (path_result > MAX_PATH || path_result == 0) return nullptr;
   UINT name_result = 0;
   char tempNameBuffer[MAX_PATH];
   name_result = GetTempFileNameA(tempPathBuffer, "", 0, tempNameBuffer);
-  if (name_result == 0) return NULL;
+  if (name_result == 0) return nullptr;
   FILE* result = FOpen(tempNameBuffer, "w+");  // Same mode as tmpfile uses.
-  if (result != NULL) {
+  if (result != nullptr) {
     Remove(tempNameBuffer);  // Delete on close.
   }
   return result;
@@ -692,24 +674,9 @@ void OS::StrNCpy(char* dest, int length, const char* src, size_t n) {
 #undef _TRUNCATE
 #undef STRUNCATE
 
-
-// Get the system's page size used by VirtualAlloc() or the next power
-// of two. The reason for always returning a power of two is that the
-// rounding up in OS::Allocate expects that.
-static size_t GetPageSize() {
-  static size_t page_size = 0;
-  if (page_size == 0) {
-    SYSTEM_INFO info;
-    GetSystemInfo(&info);
-    page_size = base::bits::RoundUpToPowerOfTwo32(info.dwPageSize);
-  }
-  return page_size;
-}
-
-
 // The allocation alignment is the guaranteed alignment for
 // VirtualAlloc'ed blocks of memory.
-size_t OS::AllocateAlignment() {
+size_t OS::AllocatePageSize() {
   static size_t allocate_alignment = 0;
   if (allocate_alignment == 0) {
     SYSTEM_INFO info;
@@ -719,10 +686,19 @@ size_t OS::AllocateAlignment() {
   return allocate_alignment;
 }
 
+size_t OS::CommitPageSize() {
+  static size_t page_size = 0;
+  if (page_size == 0) {
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    page_size = info.dwPageSize;
+    DCHECK_EQ(4096, page_size);
+  }
+  return page_size;
+}
 
 static LazyInstance<RandomNumberGenerator>::type
     platform_random_number_generator = LAZY_INSTANCE_INITIALIZER;
-
 
 void OS::Initialize(int64_t random_seed, bool hard_abort,
                     const char* const gc_fake_mmap) {
@@ -732,93 +708,157 @@ void OS::Initialize(int64_t random_seed, bool hard_abort,
   g_hard_abort = hard_abort;
 }
 
-
 void* OS::GetRandomMmapAddr() {
-  // The address range used to randomize RWX allocations in OS::Allocate
-  // Try not to map pages into the default range that windows loads DLLs
-  // Use a multiple of 64k to prevent committing unused memory.
-  // Note: This does not guarantee RWX regions will be within the
-  // range kAllocationRandomAddressMin to kAllocationRandomAddressMax
+// The address range used to randomize RWX allocations in OS::Allocate
+// Try not to map pages into the default range that windows loads DLLs
+// Use a multiple of 64k to prevent committing unused memory.
+// Note: This does not guarantee RWX regions will be within the
+// range kAllocationRandomAddressMin to kAllocationRandomAddressMax
 #ifdef V8_HOST_ARCH_64_BIT
-  static const intptr_t kAllocationRandomAddressMin = 0x0000000080000000;
-  static const intptr_t kAllocationRandomAddressMax = 0x000003FFFFFF0000;
+  static const uintptr_t kAllocationRandomAddressMin = 0x0000000080000000;
+  static const uintptr_t kAllocationRandomAddressMax = 0x000003FFFFFF0000;
 #else
-  static const intptr_t kAllocationRandomAddressMin = 0x04000000;
-  static const intptr_t kAllocationRandomAddressMax = 0x3FFF0000;
+  static const uintptr_t kAllocationRandomAddressMin = 0x04000000;
+  static const uintptr_t kAllocationRandomAddressMax = 0x3FFF0000;
 #endif
-  uintptr_t address =
-      (platform_random_number_generator.Pointer()->NextInt() << kPageSizeBits) |
-      kAllocationRandomAddressMin;
+  uintptr_t address;
+  platform_random_number_generator.Pointer()->NextBytes(&address,
+                                                        sizeof(address));
+  address <<= kPageSizeBits;
+  address += kAllocationRandomAddressMin;
   address &= kAllocationRandomAddressMax;
-  return reinterpret_cast<void *>(address);
+  return reinterpret_cast<void*>(address);
 }
 
+namespace {
 
-static void* RandomizedVirtualAlloc(size_t size, int action, int protection) {
-  LPVOID base = NULL;
+DWORD GetProtectionFromMemoryPermission(OS::MemoryPermission access) {
+  switch (access) {
+    case OS::MemoryPermission::kNoAccess:
+      return PAGE_NOACCESS;
+    case OS::MemoryPermission::kReadWrite:
+      return PAGE_READWRITE;
+    case OS::MemoryPermission::kReadWriteExecute:
+      return PAGE_EXECUTE_READWRITE;
+    case OS::MemoryPermission::kReadExecute:
+      return PAGE_EXECUTE_READ;
+  }
+  UNREACHABLE();
+}
 
-  if (protection == PAGE_EXECUTE_READWRITE || protection == PAGE_NOACCESS) {
-    // For exectutable pages try and randomize the allocation address
-    for (size_t attempts = 0; base == NULL && attempts < 3; ++attempts) {
-      base = VirtualAlloc(OS::GetRandomMmapAddr(), size, action, protection);
-    }
+uint8_t* RandomizedVirtualAlloc(size_t size, DWORD flags, DWORD protect,
+                                void* hint) {
+  LPVOID base = nullptr;
+  static BOOL use_aslr = -1;
+#ifdef V8_HOST_ARCH_32_BIT
+  // Don't bother randomizing on 32-bit hosts, because they lack the room and
+  // don't have viable ASLR anyway.
+  if (use_aslr == -1 && !IsWow64Process(GetCurrentProcess(), &use_aslr))
+    use_aslr = FALSE;
+#else
+  use_aslr = TRUE;
+#endif
+
+  if (use_aslr && protect != PAGE_READWRITE) {
+    // For executable or reserved pages try to randomize the allocation address.
+    base = VirtualAlloc(hint, size, flags, protect);
   }
 
-  // After three attempts give up and let the OS find an address to use.
-  if (base == NULL) base = VirtualAlloc(NULL, size, action, protection);
-
-  return base;
+  // On failure, let the OS find an address to use.
+  if (base == nullptr) {
+    base = VirtualAlloc(nullptr, size, flags, protect);
+  }
+  return reinterpret_cast<uint8_t*>(base);
 }
 
+}  // namespace
 
-void* OS::Allocate(const size_t requested,
-                   size_t* allocated,
-                   bool is_executable) {
-  // VirtualAlloc rounds allocated size to page size automatically.
-  size_t msize = RoundUp(requested, static_cast<int>(GetPageSize()));
+// static
+void* OS::Allocate(void* address, size_t size, size_t alignment,
+                   MemoryPermission access) {
+  size_t page_size = AllocatePageSize();
+  DCHECK_EQ(0, size % page_size);
+  DCHECK_EQ(0, alignment % page_size);
+  DCHECK_LE(page_size, alignment);
+  address = AlignedAddress(address, alignment);
 
-  // Windows XP SP2 allows Data Excution Prevention (DEP).
-  int prot = is_executable ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
+  DWORD flags = (access == OS::MemoryPermission::kNoAccess)
+                    ? MEM_RESERVE
+                    : MEM_RESERVE | MEM_COMMIT;
+  DWORD protect = GetProtectionFromMemoryPermission(access);
 
-  LPVOID mbase = RandomizedVirtualAlloc(msize,
-                                        MEM_COMMIT | MEM_RESERVE,
-                                        prot);
+  // First, try an exact size aligned allocation.
+  uint8_t* base = RandomizedVirtualAlloc(size, flags, protect, address);
+  if (base == nullptr) return nullptr;  // Can't allocate, we're OOM.
 
-  if (mbase == NULL) return NULL;
+  // If address is suitably aligned, we're done.
+  uint8_t* aligned_base = RoundUp(base, alignment);
+  if (base == aligned_base) return reinterpret_cast<void*>(base);
 
-  DCHECK((reinterpret_cast<uintptr_t>(mbase) % OS::AllocateAlignment()) == 0);
+  // Otherwise, free it and try a larger allocation.
+  CHECK(Free(base, size));
 
-  *allocated = msize;
-  return mbase;
+  // Clear the hint. It's unlikely we can allocate at this address.
+  address = nullptr;
+
+  // Add the maximum misalignment so we are guaranteed an aligned base address
+  // in the allocated region.
+  size_t padded_size = size + (alignment - page_size);
+  const int kMaxAttempts = 3;
+  aligned_base = nullptr;
+  for (int i = 0; i < kMaxAttempts; ++i) {
+    base = RandomizedVirtualAlloc(padded_size, flags, protect, address);
+    if (base == nullptr) return nullptr;  // Can't allocate, we're OOM.
+
+    // Try to trim the allocation by freeing the padded allocation and then
+    // calling VirtualAlloc at the aligned base.
+    CHECK(Free(base, padded_size));
+    aligned_base = RoundUp(base, alignment);
+    base = reinterpret_cast<uint8_t*>(
+        VirtualAlloc(aligned_base, size, flags, protect));
+    // We might not get the reduced allocation due to a race. In that case,
+    // base will be nullptr.
+    if (base != nullptr) break;
+  }
+  DCHECK_EQ(base, aligned_base);
+  return reinterpret_cast<void*>(base);
 }
 
-
-void OS::Free(void* address, const size_t size) {
-  // TODO(1240712): VirtualFree has a return value which is ignored here.
-  VirtualFree(address, 0, MEM_RELEASE);
+// static
+bool OS::Free(void* address, const size_t size) {
+  DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % AllocatePageSize());
+  // TODO(bbudge) Add DCHECK_EQ(0, size % AllocatePageSize()) when callers
+  // pass the correct size on Windows.
   USE(size);
+  return VirtualFree(address, 0, MEM_RELEASE) != 0;
 }
 
-
-intptr_t OS::CommitPageSize() {
-  return 4096;
+// static
+bool OS::Release(void* address, size_t size) {
+  DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
+  DCHECK_EQ(0, size % CommitPageSize());
+  return VirtualFree(address, size, MEM_DECOMMIT) != 0;
 }
 
-
-void OS::ProtectCode(void* address, const size_t size) {
-  DWORD old_protect;
-  VirtualProtect(address, size, PAGE_EXECUTE_READ, &old_protect);
+// static
+bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
+  DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
+  DCHECK_EQ(0, size % CommitPageSize());
+  if (access == MemoryPermission::kNoAccess) {
+    return VirtualFree(address, size, MEM_DECOMMIT) != 0;
+  }
+  DWORD protect = GetProtectionFromMemoryPermission(access);
+  return VirtualAlloc(address, size, MEM_COMMIT, protect) != nullptr;
 }
 
-
-void OS::Guard(void* address, const size_t size) {
-  DWORD oldprotect;
-  VirtualProtect(address, size, PAGE_NOACCESS, &oldprotect);
+// static
+bool OS::HasLazyCommits() {
+  // TODO(alph): implement for the platform.
+  return false;
 }
 
-
-void OS::Sleep(int milliseconds) {
-  ::Sleep(milliseconds);
+void OS::Sleep(TimeDelta interval) {
+  ::Sleep(static_cast<DWORD>(interval.InMilliseconds()));
 }
 
 
@@ -828,11 +868,14 @@ void OS::Abort() {
   }
   // Make the MSVCRT do a silent abort.
   raise(SIGABRT);
+
+  // Make sure function doesn't return.
+  abort();
 }
 
 
 void OS::DebugBreak() {
-#ifdef _MSC_VER
+#if V8_CC_MSVC
   // To avoid Visual Studio runtime support the following code can be used
   // instead
   // __asm { int 3 }
@@ -843,39 +886,40 @@ void OS::DebugBreak() {
 }
 
 
-class Win32MemoryMappedFile : public OS::MemoryMappedFile {
+class Win32MemoryMappedFile final : public OS::MemoryMappedFile {
  public:
-  Win32MemoryMappedFile(HANDLE file,
-                        HANDLE file_mapping,
-                        void* memory,
-                        int size)
+  Win32MemoryMappedFile(HANDLE file, HANDLE file_mapping, void* memory,
+                        size_t size)
       : file_(file),
         file_mapping_(file_mapping),
         memory_(memory),
-        size_(size) { }
-  virtual ~Win32MemoryMappedFile();
-  virtual void* memory() { return memory_; }
-  virtual int size() { return size_; }
+        size_(size) {}
+  ~Win32MemoryMappedFile() final;
+  void* memory() const final { return memory_; }
+  size_t size() const final { return size_; }
+
  private:
-  HANDLE file_;
-  HANDLE file_mapping_;
-  void* memory_;
-  int size_;
+  HANDLE const file_;
+  HANDLE const file_mapping_;
+  void* const memory_;
+  size_t const size_;
 };
 
 
+// static
 OS::MemoryMappedFile* OS::MemoryMappedFile::open(const char* name) {
   // Open a physical file
   HANDLE file = CreateFileA(name, GENERIC_READ | GENERIC_WRITE,
-      FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-  if (file == INVALID_HANDLE_VALUE) return NULL;
+                            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                            OPEN_EXISTING, 0, nullptr);
+  if (file == INVALID_HANDLE_VALUE) return nullptr;
 
-  int size = static_cast<int>(GetFileSize(file, NULL));
+  DWORD size = GetFileSize(file, nullptr);
 
   // Create a file mapping for the physical file
-  HANDLE file_mapping = CreateFileMapping(file, NULL,
-      PAGE_READWRITE, 0, static_cast<DWORD>(size), NULL);
-  if (file_mapping == NULL) return NULL;
+  HANDLE file_mapping =
+      CreateFileMapping(file, nullptr, PAGE_READWRITE, 0, size, nullptr);
+  if (file_mapping == nullptr) return nullptr;
 
   // Map a view of the file into memory
   void* memory = MapViewOfFile(file_mapping, FILE_MAP_ALL_ACCESS, 0, 0, size);
@@ -883,16 +927,18 @@ OS::MemoryMappedFile* OS::MemoryMappedFile::open(const char* name) {
 }
 
 
-OS::MemoryMappedFile* OS::MemoryMappedFile::create(const char* name, int size,
-    void* initial) {
+// static
+OS::MemoryMappedFile* OS::MemoryMappedFile::create(const char* name,
+                                                   size_t size, void* initial) {
   // Open a physical file
   HANDLE file = CreateFileA(name, GENERIC_READ | GENERIC_WRITE,
-      FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, 0, NULL);
-  if (file == NULL) return NULL;
+                            FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                            OPEN_ALWAYS, 0, nullptr);
+  if (file == nullptr) return nullptr;
   // Create a file mapping for the physical file
-  HANDLE file_mapping = CreateFileMapping(file, NULL,
-      PAGE_READWRITE, 0, static_cast<DWORD>(size), NULL);
-  if (file_mapping == NULL) return NULL;
+  HANDLE file_mapping = CreateFileMapping(file, nullptr, PAGE_READWRITE, 0,
+                                          static_cast<DWORD>(size), nullptr);
+  if (file_mapping == nullptr) return nullptr;
   // Map a view of the file into memory
   void* memory = MapViewOfFile(file_mapping, FILE_MAP_ALL_ACCESS, 0, 0, size);
   if (memory) memmove(memory, initial, size);
@@ -901,8 +947,7 @@ OS::MemoryMappedFile* OS::MemoryMappedFile::create(const char* name, int size,
 
 
 Win32MemoryMappedFile::~Win32MemoryMappedFile() {
-  if (memory_ != NULL)
-    UnmapViewOfFile(memory_);
+  if (memory_) UnmapViewOfFile(memory_);
   CloseHandle(file_mapping_);
   CloseHandle(file_);
 }
@@ -1009,7 +1054,7 @@ typedef BOOL (__stdcall *DLL_FUNC_TYPE(Module32NextW))(HANDLE hSnapshot,
 #undef VOID
 
 // Declare a variable for each dynamically loaded DLL function.
-#define DEF_DLL_FUNCTION(name) DLL_FUNC_TYPE(name) DLL_FUNC_VAR(name) = NULL;
+#define DEF_DLL_FUNCTION(name) DLL_FUNC_TYPE(name) DLL_FUNC_VAR(name) = nullptr;
 DBGHELP_FUNCTION_LIST(DEF_DLL_FUNCTION)
 TLHELP32_FUNCTION_LIST(DEF_DLL_FUNCTION)
 #undef DEF_DLL_FUNCTION
@@ -1026,7 +1071,7 @@ static bool LoadDbgHelpAndTlHelp32() {
 
   // Load functions from the dbghelp.dll module.
   module = LoadLibrary(TEXT("dbghelp.dll"));
-  if (module == NULL) {
+  if (module == nullptr) {
     return false;
   }
 
@@ -1041,7 +1086,7 @@ DBGHELP_FUNCTION_LIST(LOAD_DLL_FUNC)
   // Load functions from the kernel32.dll module (the TlHelp32.h function used
   // to be in tlhelp32.dll but are now moved to kernel32.dll).
   module = LoadLibrary(TEXT("kernel32.dll"));
-  if (module == NULL) {
+  if (module == nullptr) {
     return false;
   }
 
@@ -1054,14 +1099,14 @@ TLHELP32_FUNCTION_LIST(LOAD_DLL_FUNC)
 #undef LOAD_DLL_FUNC
 
   // Check that all functions where loaded.
-  bool result =
-#define DLL_FUNC_LOADED(name) (DLL_FUNC_VAR(name) != NULL) &&
+bool result =
+#define DLL_FUNC_LOADED(name) (DLL_FUNC_VAR(name) != nullptr)&&
 
-DBGHELP_FUNCTION_LIST(DLL_FUNC_LOADED)
-TLHELP32_FUNCTION_LIST(DLL_FUNC_LOADED)
+    DBGHELP_FUNCTION_LIST(DLL_FUNC_LOADED)
+        TLHELP32_FUNCTION_LIST(DLL_FUNC_LOADED)
 
 #undef DLL_FUNC_LOADED
-  true;
+            true;
 
   dbghelp_loaded = result;
   return result;
@@ -1088,7 +1133,7 @@ static std::vector<OS::SharedLibraryAddress> LoadSymbols(
 
   // Initialize the symbol engine.
   ok = _SymInitialize(process_handle,  // hProcess
-                      NULL,            // UserSearchPath
+                      nullptr,         // UserSearchPath
                       false);          // fInvadeProcess
   if (!ok) return result;
 
@@ -1132,14 +1177,14 @@ static std::vector<OS::SharedLibraryAddress> LoadSymbols(
       }
     }
     int lib_name_length = WideCharToMultiByte(
-        CP_UTF8, 0, module_entry.szExePath, -1, NULL, 0, NULL, NULL);
+        CP_UTF8, 0, module_entry.szExePath, -1, nullptr, 0, nullptr, nullptr);
     std::string lib_name(lib_name_length, 0);
     WideCharToMultiByte(CP_UTF8, 0, module_entry.szExePath, -1, &lib_name[0],
-                        lib_name_length, NULL, NULL);
+                        lib_name_length, nullptr, nullptr);
     result.push_back(OS::SharedLibraryAddress(
-        lib_name, reinterpret_cast<unsigned int>(module_entry.modBaseAddr),
-        reinterpret_cast<unsigned int>(module_entry.modBaseAddr +
-                                       module_entry.modBaseSize)));
+        lib_name, reinterpret_cast<uintptr_t>(module_entry.modBaseAddr),
+        reinterpret_cast<uintptr_t>(module_entry.modBaseAddr +
+                                    module_entry.modBaseSize)));
     cont = _Module32NextW(snapshot, &module_entry);
   }
   CloseHandle(snapshot);
@@ -1159,28 +1204,15 @@ std::vector<OS::SharedLibraryAddress> OS::GetSharedLibraryAddresses() {
   return LoadSymbols(process_handle);
 }
 
-
-void OS::SignalCodeMovingGC() {
-}
-
+void OS::SignalCodeMovingGC() {}
 
 #else  // __MINGW32__
 std::vector<OS::SharedLibraryAddress> OS::GetSharedLibraryAddresses() {
   return std::vector<OS::SharedLibraryAddress>();
 }
 
-
-void OS::SignalCodeMovingGC() { }
+void OS::SignalCodeMovingGC() {}
 #endif  // __MINGW32__
-
-
-double OS::nan_value() {
-#ifdef _MSC_VER
-  return std::numeric_limits<double>::quiet_NaN();
-#else  // _MSC_VER
-  return NAN;
-#endif  // _MSC_VER
-}
 
 
 int OS::ActivationFrameAlignment() {
@@ -1194,112 +1226,6 @@ int OS::ActivationFrameAlignment() {
   return 8;  // Floating-point math runs faster with 8-byte alignment.
 #endif
 }
-
-
-VirtualMemory::VirtualMemory() : address_(NULL), size_(0) { }
-
-
-VirtualMemory::VirtualMemory(size_t size)
-    : address_(ReserveRegion(size)), size_(size) { }
-
-
-VirtualMemory::VirtualMemory(size_t size, size_t alignment)
-    : address_(NULL), size_(0) {
-  DCHECK((alignment % OS::AllocateAlignment()) == 0);
-  size_t request_size = RoundUp(size + alignment,
-                                static_cast<intptr_t>(OS::AllocateAlignment()));
-  void* address = ReserveRegion(request_size);
-  if (address == NULL) return;
-  uint8_t* base = RoundUp(static_cast<uint8_t*>(address), alignment);
-  // Try reducing the size by freeing and then reallocating a specific area.
-  bool result = ReleaseRegion(address, request_size);
-  USE(result);
-  DCHECK(result);
-  address = VirtualAlloc(base, size, MEM_RESERVE, PAGE_NOACCESS);
-  if (address != NULL) {
-    request_size = size;
-    DCHECK(base == static_cast<uint8_t*>(address));
-  } else {
-    // Resizing failed, just go with a bigger area.
-    address = ReserveRegion(request_size);
-    if (address == NULL) return;
-  }
-  address_ = address;
-  size_ = request_size;
-}
-
-
-VirtualMemory::~VirtualMemory() {
-  if (IsReserved()) {
-    bool result = ReleaseRegion(address(), size());
-    DCHECK(result);
-    USE(result);
-  }
-}
-
-
-bool VirtualMemory::IsReserved() {
-  return address_ != NULL;
-}
-
-
-void VirtualMemory::Reset() {
-  address_ = NULL;
-  size_ = 0;
-}
-
-
-bool VirtualMemory::Commit(void* address, size_t size, bool is_executable) {
-  return CommitRegion(address, size, is_executable);
-}
-
-
-bool VirtualMemory::Uncommit(void* address, size_t size) {
-  DCHECK(IsReserved());
-  return UncommitRegion(address, size);
-}
-
-
-bool VirtualMemory::Guard(void* address) {
-  if (NULL == VirtualAlloc(address,
-                           OS::CommitPageSize(),
-                           MEM_COMMIT,
-                           PAGE_NOACCESS)) {
-    return false;
-  }
-  return true;
-}
-
-
-void* VirtualMemory::ReserveRegion(size_t size) {
-  return RandomizedVirtualAlloc(size, MEM_RESERVE, PAGE_NOACCESS);
-}
-
-
-bool VirtualMemory::CommitRegion(void* base, size_t size, bool is_executable) {
-  int prot = is_executable ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
-  if (NULL == VirtualAlloc(base, size, MEM_COMMIT, prot)) {
-    return false;
-  }
-  return true;
-}
-
-
-bool VirtualMemory::UncommitRegion(void* base, size_t size) {
-  return VirtualFree(base, size, MEM_DECOMMIT) != 0;
-}
-
-
-bool VirtualMemory::ReleaseRegion(void* base, size_t size) {
-  return VirtualFree(base, 0, MEM_RELEASE) != 0;
-}
-
-
-bool VirtualMemory::HasLazyCommits() {
-  // TODO(alph): implement for the platform.
-  return false;
-}
-
 
 // ----------------------------------------------------------------------------
 // Win32 thread support.
@@ -1330,8 +1256,7 @@ class Thread::PlatformData {
 // handle until it is started.
 
 Thread::Thread(const Options& options)
-    : stack_size_(options.stack_size()),
-      start_semaphore_(NULL) {
+    : stack_size_(options.stack_size()), start_semaphore_(nullptr) {
   data_ = new PlatformData(kNoThread);
   set_name(options.name());
 }
@@ -1355,12 +1280,8 @@ Thread::~Thread() {
 // initialize thread specific structures in the C runtime library.
 void Thread::Start() {
   data_->thread_ = reinterpret_cast<HANDLE>(
-      _beginthreadex(NULL,
-                     static_cast<unsigned>(stack_size_),
-                     ThreadEntry,
-                     this,
-                     0,
-                     &data_->thread_id_));
+      _beginthreadex(nullptr, static_cast<unsigned>(stack_size_), ThreadEntry,
+                     this, 0, &data_->thread_id_));
 }
 
 
@@ -1397,10 +1318,5 @@ void Thread::SetThreadLocal(LocalStorageKey key, void* value) {
   DCHECK(result);
 }
 
-
-
-void Thread::YieldCPU() {
-  Sleep(0);
-}
-
-} }  // namespace v8::base
+}  // namespace base
+}  // namespace v8

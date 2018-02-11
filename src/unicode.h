@@ -7,6 +7,7 @@
 
 #include <sys/types.h>
 #include "src/globals.h"
+#include "src/utils.h"
 /**
  * \file
  * Definitions and convenience functions for working with unicode.
@@ -28,21 +29,32 @@ class Predicate {
  public:
   inline Predicate() { }
   inline bool get(uchar c);
+
  private:
   friend class Test;
   bool CalculateValue(uchar c);
-  struct CacheEntry {
-    inline CacheEntry() : code_point_(0), value_(0) { }
+  class CacheEntry {
+   public:
+    inline CacheEntry()
+        : bit_field_(CodePointField::encode(0) | ValueField::encode(0)) {}
     inline CacheEntry(uchar code_point, bool value)
-      : code_point_(code_point),
-        value_(value) { }
-    uchar code_point_ : 21;
-    bool value_ : 1;
+        : bit_field_(CodePointField::encode(code_point) |
+                     ValueField::encode(value)) {}
+
+    uchar code_point() const { return CodePointField::decode(bit_field_); }
+    bool value() const { return ValueField::decode(bit_field_); }
+
+   private:
+    class CodePointField : public v8::internal::BitField<uchar, 0, 21> {};
+    class ValueField : public v8::internal::BitField<bool, 21, 1> {};
+
+    uint32_t bit_field_;
   };
   static const int kSize = size;
   static const int kMask = kSize - 1;
   CacheEntry entries_[kSize];
 };
+
 
 // A cache used in case conversion.  It caches the value for characters
 // that either have no mapping or map to a single character independent
@@ -70,12 +82,14 @@ class Mapping {
   CacheEntry entries_[kSize];
 };
 
+
 class UnicodeData {
  private:
   friend class Test;
   static int GetByteCount();
   static const uchar kMaxCodePoint;
 };
+
 
 class Utf16 {
  public:
@@ -113,16 +127,7 @@ class Utf16 {
   }
 };
 
-class Latin1 {
- public:
-  static const unsigned kMaxChar = 0xff;
-  // Returns 0 if character does not convert to single latin-1 character
-  // or if the character doesn't not convert back to latin-1 via inverse
-  // operation (upper to lower, etc).
-  static inline uint16_t ConvertNonLatin1ToLatin1(uint16_t);
-};
-
-class Utf8 {
+class V8_EXPORT_PRIVATE Utf8 {
  public:
   static inline uchar Length(uchar chr, int previous);
   static inline unsigned EncodeOneByte(char* out, uint8_t c);
@@ -130,13 +135,13 @@ class Utf8 {
                                 uchar c,
                                 int previous,
                                 bool replace_invalid = false);
-  static uchar CalculateValue(const byte* str,
-                              unsigned length,
-                              unsigned* cursor);
+  static uchar CalculateValue(const byte* str, size_t length, size_t* cursor);
 
   // The unicode replacement character, used to signal invalid unicode
   // sequences (e.g. an orphan surrogate) when converting to a UTF-8 encoding.
   static const uchar kBadChar = 0xFFFD;
+  static const uchar kBufferEmpty = 0x0;
+  static const uchar kIncomplete = 0xFFFFFFFC;  // any non-valid code point.
   static const unsigned kMaxEncodedSize   = 4;
   static const unsigned kMaxOneByteChar   = 0x7f;
   static const unsigned kMaxTwoByteChar   = 0x7ff;
@@ -150,74 +155,53 @@ class Utf8 {
   // The maximum size a single UTF-16 code unit may take up when encoded as
   // UTF-8.
   static const unsigned kMax16BitCodeUnitSize  = 3;
-  static inline uchar ValueOf(const byte* str,
-                              unsigned length,
-                              unsigned* cursor);
+  static inline uchar ValueOf(const byte* str, size_t length, size_t* cursor);
+
+  typedef uint32_t Utf8IncrementalBuffer;
+  static uchar ValueOfIncremental(byte next_byte,
+                                  Utf8IncrementalBuffer* buffer);
+  static uchar ValueOfIncrementalFinish(Utf8IncrementalBuffer* buffer);
+
+  // Excludes non-characters from the set of valid code points.
+  static inline bool IsValidCharacter(uchar c);
+
+  // Validate if the input has a valid utf-8 encoding. Unlike JS source code
+  // this validation function will accept any unicode code point, including
+  // kBadChar and BOMs.
+  //
+  // This method checks for:
+  // - valid utf-8 endcoding (e.g. no over-long encodings),
+  // - absence of surrogates,
+  // - valid code point range.
+  static bool ValidateEncoding(const byte* str, size_t length);
 };
-
-
-class Utf8DecoderBase {
- public:
-  // Initialization done in subclass.
-  inline Utf8DecoderBase();
-  inline Utf8DecoderBase(uint16_t* buffer,
-                         unsigned buffer_length,
-                         const uint8_t* stream,
-                         unsigned stream_length);
-  inline unsigned Utf16Length() const { return utf16_length_; }
- protected:
-  // This reads all characters and sets the utf16_length_.
-  // The first buffer_length utf16 chars are cached in the buffer.
-  void Reset(uint16_t* buffer,
-             unsigned buffer_length,
-             const uint8_t* stream,
-             unsigned stream_length);
-  static void WriteUtf16Slow(const uint8_t* stream,
-                             uint16_t* data,
-                             unsigned length);
-  const uint8_t* unbuffered_start_;
-  unsigned utf16_length_;
-  bool last_byte_of_buffer_unused_;
- private:
-  DISALLOW_COPY_AND_ASSIGN(Utf8DecoderBase);
-};
-
-template <unsigned kBufferSize>
-class Utf8Decoder : public Utf8DecoderBase {
- public:
-  inline Utf8Decoder() {}
-  inline Utf8Decoder(const char* stream, unsigned length);
-  inline void Reset(const char* stream, unsigned length);
-  inline unsigned WriteUtf16(uint16_t* data, unsigned length) const;
- private:
-  uint16_t buffer_[kBufferSize];
-};
-
 
 struct Uppercase {
-  static bool Is(uchar c);
-};
-struct Lowercase {
   static bool Is(uchar c);
 };
 struct Letter {
   static bool Is(uchar c);
 };
-struct Number {
+#ifndef V8_INTL_SUPPORT
+struct V8_EXPORT_PRIVATE ID_Start {
   static bool Is(uchar c);
 };
-struct WhiteSpace {
+struct V8_EXPORT_PRIVATE ID_Continue {
   static bool Is(uchar c);
 };
-struct LineTerminator {
+struct V8_EXPORT_PRIVATE WhiteSpace {
   static bool Is(uchar c);
 };
-struct CombiningMark {
-  static bool Is(uchar c);
-};
-struct ConnectorPunctuation {
-  static bool Is(uchar c);
-};
+#endif  // !V8_INTL_SUPPORT
+
+// LineTerminator:       'JS_Line_Terminator' in point.properties
+// ES#sec-line-terminators lists exactly 4 code points:
+// LF (U+000A), CR (U+000D), LS(U+2028), PS(U+2029)
+V8_INLINE bool IsLineTerminator(uchar c) {
+  return c == 0x000A || c == 0x000D || c == 0x2028 || c == 0x2029;
+}
+
+#ifndef V8_INTL_SUPPORT
 struct ToLowercase {
   static const int kMaxWidth = 3;
   static const bool kIsToLower = true;
@@ -234,6 +218,7 @@ struct ToUppercase {
                      uchar* result,
                      bool* allow_caching_ptr);
 };
+#endif
 struct Ecma262Canonicalize {
   static const int kMaxWidth = 1;
   static int Convert(uchar c,

@@ -5,8 +5,7 @@
 #ifndef V8_COMPILER_BASIC_BLOCK_INSTRUMENTOR_H_
 #define V8_COMPILER_BASIC_BLOCK_INSTRUMENTOR_H_
 
-#include "src/v8.h"
-
+#include "src/allocation.h"
 #include "src/basic-block-profiler.h"
 
 namespace v8 {
@@ -22,7 +21,8 @@ class Schedule;
 class BasicBlockInstrumentor : public AllStatic {
  public:
   static BasicBlockProfiler::Data* Instrument(CompilationInfo* info,
-                                              Graph* graph, Schedule* schedule);
+                                              Graph* graph, Schedule* schedule,
+                                              Isolate* isolate);
 };
 
 }  // namespace compiler

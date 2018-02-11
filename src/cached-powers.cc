@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/cached-powers.h"
+
 #include <limits.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <cmath>
 
-#include "include/v8stdint.h"
 #include "src/base/logging.h"
-#include "src/cached-powers.h"
 #include "src/globals.h"
 
 namespace v8 {
@@ -145,7 +146,7 @@ void PowersOfTenCache::GetCachedPowerForBinaryExponentRange(
 void PowersOfTenCache::GetCachedPowerForDecimalExponent(int requested_exponent,
                                                         DiyFp* power,
                                                         int* found_exponent) {
-  DCHECK(kMinDecimalExponent <= requested_exponent);
+  DCHECK_LE(kMinDecimalExponent, requested_exponent);
   DCHECK(requested_exponent < kMaxDecimalExponent + kDecimalExponentDistance);
   int index =
       (requested_exponent + kCachedPowersOffset) / kDecimalExponentDistance;
@@ -156,4 +157,5 @@ void PowersOfTenCache::GetCachedPowerForDecimalExponent(int requested_exponent,
   DCHECK(requested_exponent < *found_exponent + kDecimalExponentDistance);
 }
 
-} }  // namespace v8::internal
+}  // namespace internal
+}  // namespace v8

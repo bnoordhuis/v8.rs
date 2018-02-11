@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <stdint.h>
+
 #include <cmath>
 
-#include "include/v8stdint.h"
 #include "src/base/logging.h"
 #include "src/utils.h"
 
@@ -35,7 +36,7 @@ class UInt128 {
     accumulator >>= 32;
     accumulator = accumulator + (high_bits_ >> 32) * multiplicand;
     high_bits_ = (accumulator << 32) + part;
-    DCHECK((accumulator >> 32) == 0);
+    DCHECK_EQ(accumulator >> 32, 0);
   }
 
   void Shift(int shift_amount) {
@@ -167,8 +168,7 @@ static void FillDigits64(uint64_t number, Vector<char> buffer, int* length) {
   }
 }
 
-
-static void RoundUp(Vector<char> buffer, int* length, int* decimal_point) {
+static void DtoaRoundUp(Vector<char> buffer, int* length, int* decimal_point) {
   // An empty buffer represents 0.
   if (*length == 0) {
     buffer[0] = '1';
@@ -218,7 +218,7 @@ static void FillFractionals(uint64_t fractionals, int exponent,
   // is a fixed-point number, with binary point at bit 'point'.
   if (-exponent <= 64) {
     // One 64 bit number is sufficient.
-    DCHECK(fractionals >> 56 == 0);
+    DCHECK_EQ(fractionals >> 56, 0);
     int point = -exponent;
     for (int i = 0; i < fractional_count; ++i) {
       if (fractionals == 0) break;
@@ -241,7 +241,7 @@ static void FillFractionals(uint64_t fractionals, int exponent,
     }
     // If the first bit after the point is set we have to round up.
     if (((fractionals >> (point - 1)) & 1) == 1) {
-      RoundUp(buffer, length, decimal_point);
+      DtoaRoundUp(buffer, length, decimal_point);
     }
   } else {  // We need 128 bits.
     DCHECK(64 < -exponent && -exponent <= 128);
@@ -260,7 +260,7 @@ static void FillFractionals(uint64_t fractionals, int exponent,
       (*length)++;
     }
     if (fractionals128.BitAt(point - 1) == 1) {
-      RoundUp(buffer, length, decimal_point);
+      DtoaRoundUp(buffer, length, decimal_point);
     }
   }
 }
@@ -362,7 +362,7 @@ bool FastFixedDtoa(double v,
   } else if (exponent < -128) {
     // This configuration (with at most 20 digits) means that all digits must be
     // 0.
-    DCHECK(fractional_count <= 20);
+    DCHECK_LE(fractional_count, 20);
     buffer[0] = '\0';
     *length = 0;
     *decimal_point = -fractional_count;
@@ -381,4 +381,5 @@ bool FastFixedDtoa(double v,
   return true;
 }
 
-} }  // namespace v8::internal
+}  // namespace internal
+}  // namespace v8

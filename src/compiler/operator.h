@@ -5,9 +5,14 @@
 #ifndef V8_COMPILER_OPERATOR_H_
 #define V8_COMPILER_OPERATOR_H_
 
+#include <ostream>  // NOLINT(readability/streams)
+
+#include "src/base/compiler-specific.h"
 #include "src/base/flags.h"
-#include "src/ostreams.h"
-#include "src/unique.h"
+#include "src/base/functional.h"
+#include "src/globals.h"
+#include "src/handles.h"
+#include "src/zone/zone.h"
 
 namespace v8 {
 namespace internal {
@@ -25,31 +30,42 @@ namespace compiler {
 // as the name for a named field access, the ID of a runtime function, etc.
 // Static parameters are private to the operator and only semantically
 // meaningful to the operator itself.
-class Operator : public ZoneObject {
+class V8_EXPORT_PRIVATE Operator : public NON_EXPORTED_BASE(ZoneObject) {
  public:
-  typedef uint8_t Opcode;
+  typedef uint16_t Opcode;
 
   // Properties inform the operator-independent optimizer about legal
   // transformations for nodes that have this operator.
   enum Property {
     kNoProperties = 0,
-    kReducible = 1 << 0,    // Participates in strength reduction.
-    kCommutative = 1 << 1,  // OP(a, b) == OP(b, a) for all inputs.
-    kAssociative = 1 << 2,  // OP(a, OP(b,c)) == OP(OP(a,b), c) for all inputs.
-    kIdempotent = 1 << 3,   // OP(a); OP(a) == OP(a).
-    kNoRead = 1 << 4,       // Has no scheduling dependency on Effects
-    kNoWrite = 1 << 5,      // Does not modify any Effects and thereby
+    kCommutative = 1 << 0,  // OP(a, b) == OP(b, a) for all inputs.
+    kAssociative = 1 << 1,  // OP(a, OP(b,c)) == OP(OP(a,b), c) for all inputs.
+    kIdempotent = 1 << 2,   // OP(a); OP(a) == OP(a).
+    kNoRead = 1 << 3,       // Has no scheduling dependency on Effects
+    kNoWrite = 1 << 4,      // Does not modify any Effects and thereby
                             // create new scheduling dependencies.
-    kNoThrow = 1 << 6,      // Can never generate an exception.
+    kNoThrow = 1 << 5,      // Can never generate an exception.
+    kNoDeopt = 1 << 6,      // Can never generate an eager deoptimization exit.
     kFoldable = kNoRead | kNoWrite,
-    kEliminatable = kNoWrite | kNoThrow,
-    kPure = kNoRead | kNoWrite | kNoThrow | kIdempotent
+    kKontrol = kNoDeopt | kFoldable | kNoThrow,
+    kEliminatable = kNoDeopt | kNoWrite | kNoThrow,
+    kPure = kNoDeopt | kNoRead | kNoWrite | kNoThrow | kIdempotent
   };
-  typedef base::Flags<Property, uint8_t> Properties;
 
-  Operator(Opcode opcode, Properties properties, const char* mnemonic)
-      : opcode_(opcode), properties_(properties), mnemonic_(mnemonic) {}
-  virtual ~Operator();
+// List of all bits, for the visualizer.
+#define OPERATOR_PROPERTY_LIST(V) \
+  V(Commutative)                  \
+  V(Associative) V(Idempotent) V(NoRead) V(NoWrite) V(NoThrow) V(NoDeopt)
+
+  typedef base::Flags<Property, uint8_t> Properties;
+  enum class PrintVerbosity { kVerbose, kSilent };
+
+  // Constructor.
+  Operator(Opcode opcode, Properties properties, const char* mnemonic,
+           size_t value_in, size_t effect_in, size_t control_in,
+           size_t value_out, size_t effect_out, size_t control_out);
+
+  virtual ~Operator() {}
 
   // A small integer unique to all instances of a particular kind of operator,
   // useful for quick matching for specific kinds of operators. For fast access
@@ -63,37 +79,69 @@ class Operator : public ZoneObject {
   // Check if this operator equals another operator. Equivalent operators can
   // be merged, and nodes with equivalent operators and equivalent inputs
   // can be merged.
-  virtual bool Equals(const Operator* other) const = 0;
+  virtual bool Equals(const Operator* that) const {
+    return this->opcode() == that->opcode();
+  }
 
   // Compute a hashcode to speed up equivalence-set checking.
   // Equal operators should always have equal hashcodes, and unequal operators
   // should have unequal hashcodes with high probability.
-  virtual int HashCode() const = 0;
+  virtual size_t HashCode() const { return base::hash<Opcode>()(opcode()); }
 
   // Check whether this operator has the given property.
   bool HasProperty(Property property) const {
     return (properties() & property) == property;
   }
 
-  // Number of data inputs to the operator, for verifying graph structure.
-  virtual int InputCount() const = 0;
-
-  // Number of data outputs from the operator, for verifying graph structure.
-  virtual int OutputCount() const = 0;
-
   Properties properties() const { return properties_; }
 
+  // TODO(titzer): convert return values here to size_t.
+  int ValueInputCount() const { return value_in_; }
+  int EffectInputCount() const { return effect_in_; }
+  int ControlInputCount() const { return control_in_; }
+
+  int ValueOutputCount() const { return value_out_; }
+  int EffectOutputCount() const { return effect_out_; }
+  int ControlOutputCount() const { return control_out_; }
+
+  static size_t ZeroIfEliminatable(Properties properties) {
+    return (properties & kEliminatable) == kEliminatable ? 0 : 1;
+  }
+
+  static size_t ZeroIfNoThrow(Properties properties) {
+    return (properties & kNoThrow) == kNoThrow ? 0 : 2;
+  }
+
+  static size_t ZeroIfPure(Properties properties) {
+    return (properties & kPure) == kPure ? 0 : 1;
+  }
+
   // TODO(titzer): API for input and output types, for typechecking graph.
- protected:
+
   // Print the full operator into the given stream, including any
   // static parameters. Useful for debugging and visualizing the IR.
-  virtual std::ostream& PrintTo(std::ostream& os) const = 0;  // NOLINT
-  friend std::ostream& operator<<(std::ostream& os, const Operator& op);
+  void PrintTo(std::ostream& os,
+               PrintVerbosity verbose = PrintVerbosity::kVerbose) const {
+    // We cannot make PrintTo virtual, because default arguments to virtual
+    // methods are banned in the style guide.
+    return PrintToImpl(os, verbose);
+  }
+
+  void PrintPropsTo(std::ostream& os) const;
+
+ protected:
+  virtual void PrintToImpl(std::ostream& os, PrintVerbosity verbose) const;
 
  private:
+  const char* mnemonic_;
   Opcode opcode_;
   Properties properties_;
-  const char* mnemonic_;
+  uint32_t value_in_;
+  uint32_t effect_in_;
+  uint32_t control_in_;
+  uint32_t value_out_;
+  uint8_t effect_out_;
+  uint32_t control_out_;
 
   DISALLOW_COPY_AND_ASSIGN(Operator);
 };
@@ -102,160 +150,100 @@ DEFINE_OPERATORS_FOR_FLAGS(Operator::Properties)
 
 std::ostream& operator<<(std::ostream& os, const Operator& op);
 
-// An implementation of Operator that has no static parameters. Such operators
-// have just a name, an opcode, and a fixed number of inputs and outputs.
-// They can represented by singletons and shared globally.
-class SimpleOperator : public Operator {
- public:
-  SimpleOperator(Opcode opcode, Properties properties, int input_count,
-                 int output_count, const char* mnemonic);
-  ~SimpleOperator();
 
-  virtual bool Equals(const Operator* that) const FINAL {
-    return opcode() == that->opcode();
-  }
-  virtual int HashCode() const FINAL { return opcode(); }
-  virtual int InputCount() const FINAL { return input_count_; }
-  virtual int OutputCount() const FINAL { return output_count_; }
-
- private:
-  virtual std::ostream& PrintTo(std::ostream& os) const FINAL {  // NOLINT
-    return os << mnemonic();
-  }
-
-  int input_count_;
-  int output_count_;
-
-  DISALLOW_COPY_AND_ASSIGN(SimpleOperator);
-};
-
-// Template specialization implements a kind of type class for dealing with the
-// static parameters of Operator1 automatically.
+// Default equality function for below Operator1<*> class.
 template <typename T>
-struct StaticParameterTraits {
-  static std::ostream& PrintTo(std::ostream& os, T val) {  // NOLINT
-    return os << "??";
-  }
-  static int HashCode(T a) { return 0; }
-  static bool Equals(T a, T b) {
-    return false;  // Not every T has a ==. By default, be conservative.
-  }
-};
+struct OpEqualTo : public std::equal_to<T> {};
 
-// Specialization for static parameters of type {int}.
-template <>
-struct StaticParameterTraits<int> {
-  static std::ostream& PrintTo(std::ostream& os, int val) {  // NOLINT
-    return os << val;
-  }
-  static int HashCode(int a) { return a; }
-  static bool Equals(int a, int b) { return a == b; }
-};
 
-// Specialization for static parameters of type {double}.
-template <>
-struct StaticParameterTraits<double> {
-  static std::ostream& PrintTo(std::ostream& os, double val) {  // NOLINT
-    return os << val;
-  }
-  static int HashCode(double a) {
-    return static_cast<int>(bit_cast<int64_t>(a));
-  }
-  static bool Equals(double a, double b) {
-    return bit_cast<int64_t>(a) == bit_cast<int64_t>(b);
-  }
-};
+// Default hashing function for below Operator1<*> class.
+template <typename T>
+struct OpHash : public base::hash<T> {};
 
-// Specialization for static parameters of type {Unique<Object>}.
-template <>
-struct StaticParameterTraits<Unique<Object> > {
-  static std::ostream& PrintTo(std::ostream& os,
-                               Unique<Object> val) {  // NOLINT
-    return os << Brief(*val.handle());
-  }
-  static int HashCode(Unique<Object> a) {
-    return static_cast<int>(a.Hashcode());
-  }
-  static bool Equals(Unique<Object> a, Unique<Object> b) { return a == b; }
-};
-
-// Specialization for static parameters of type {Unique<Name>}.
-template <>
-struct StaticParameterTraits<Unique<Name> > {
-  static std::ostream& PrintTo(std::ostream& os, Unique<Name> val) {  // NOLINT
-    return os << Brief(*val.handle());
-  }
-  static int HashCode(Unique<Name> a) { return static_cast<int>(a.Hashcode()); }
-  static bool Equals(Unique<Name> a, Unique<Name> b) { return a == b; }
-};
-
-#if DEBUG
-// Specialization for static parameters of type {Handle<Object>} to prevent any
-// direct usage of Handles in constants.
-template <>
-struct StaticParameterTraits<Handle<Object> > {
-  static std::ostream& PrintTo(std::ostream& os,
-                               Handle<Object> val) {  // NOLINT
-    UNREACHABLE();  // Should use Unique<Object> instead
-    return os;
-  }
-  static int HashCode(Handle<Object> a) {
-    UNREACHABLE();  // Should use Unique<Object> instead
-    return 0;
-  }
-  static bool Equals(Handle<Object> a, Handle<Object> b) {
-    UNREACHABLE();  // Should use Unique<Object> instead
-    return false;
-  }
-};
-#endif
 
 // A templatized implementation of Operator that has one static parameter of
-// type {T}. If a specialization of StaticParameterTraits<{T}> exists, then
-// operators of this kind can automatically be hashed, compared, and printed.
-template <typename T>
+// type {T} with the proper default equality and hashing functions.
+template <typename T, typename Pred = OpEqualTo<T>, typename Hash = OpHash<T>>
 class Operator1 : public Operator {
  public:
-  Operator1(Opcode opcode, Properties properties, int input_count,
-            int output_count, const char* mnemonic, T parameter)
-      : Operator(opcode, properties, mnemonic),
-        input_count_(input_count),
-        output_count_(output_count),
-        parameter_(parameter) {}
+  Operator1(Opcode opcode, Properties properties, const char* mnemonic,
+            size_t value_in, size_t effect_in, size_t control_in,
+            size_t value_out, size_t effect_out, size_t control_out,
+            T parameter, Pred const& pred = Pred(), Hash const& hash = Hash())
+      : Operator(opcode, properties, mnemonic, value_in, effect_in, control_in,
+                 value_out, effect_out, control_out),
+        parameter_(parameter),
+        pred_(pred),
+        hash_(hash) {}
 
-  const T& parameter() const { return parameter_; }
+  T const& parameter() const { return parameter_; }
 
-  virtual bool Equals(const Operator* other) const OVERRIDE {
+  bool Equals(const Operator* other) const final {
     if (opcode() != other->opcode()) return false;
-    const Operator1<T>* that = static_cast<const Operator1<T>*>(other);
-    return StaticParameterTraits<T>::Equals(this->parameter_, that->parameter_);
+    const Operator1<T, Pred, Hash>* that =
+        reinterpret_cast<const Operator1<T, Pred, Hash>*>(other);
+    return this->pred_(this->parameter(), that->parameter());
   }
-  virtual int HashCode() const OVERRIDE {
-    return opcode() + 33 * StaticParameterTraits<T>::HashCode(this->parameter_);
+  size_t HashCode() const final {
+    return base::hash_combine(this->opcode(), this->hash_(this->parameter()));
   }
-  virtual int InputCount() const OVERRIDE { return input_count_; }
-  virtual int OutputCount() const OVERRIDE { return output_count_; }
-  virtual std::ostream& PrintParameter(std::ostream& os) const {  // NOLINT
-    return StaticParameterTraits<T>::PrintTo(os << "[", parameter_) << "]";
+  // For most parameter types, we have only a verbose way to print them, namely
+  // ostream << parameter. But for some types it is particularly useful to have
+  // a shorter way to print them for the node labels in Turbolizer. The
+  // following method can be overridden to provide a concise and a verbose
+  // printing of a parameter.
+
+  virtual void PrintParameter(std::ostream& os, PrintVerbosity verbose) const {
+    os << "[" << parameter() << "]";
   }
 
- protected:
-  virtual std::ostream& PrintTo(std::ostream& os) const FINAL {  // NOLINT
-    return PrintParameter(os << mnemonic());
+  virtual void PrintToImpl(std::ostream& os, PrintVerbosity verbose) const {
+    os << mnemonic();
+    PrintParameter(os, verbose);
   }
 
  private:
-  int input_count_;
-  int output_count_;
-  T parameter_;
+  T const parameter_;
+  Pred const pred_;
+  Hash const hash_;
 };
 
 
 // Helper to extract parameters from Operator1<*> operator.
 template <typename T>
-static inline const T& OpParameter(const Operator* op) {
-  return reinterpret_cast<const Operator1<T>*>(op)->parameter();
+inline T const& OpParameter(const Operator* op) {
+  return reinterpret_cast<const Operator1<T, OpEqualTo<T>, OpHash<T>>*>(op)
+      ->parameter();
 }
+
+
+// NOTE: We have to be careful to use the right equal/hash functions below, for
+// float/double we always use the ones operating on the bit level, for Handle<>
+// we always use the ones operating on the location level.
+template <>
+struct OpEqualTo<float> : public base::bit_equal_to<float> {};
+template <>
+struct OpHash<float> : public base::bit_hash<float> {};
+
+template <>
+struct OpEqualTo<double> : public base::bit_equal_to<double> {};
+template <>
+struct OpHash<double> : public base::bit_hash<double> {};
+
+template <>
+struct OpEqualTo<Handle<HeapObject>> : public Handle<HeapObject>::equal_to {};
+template <>
+struct OpHash<Handle<HeapObject>> : public Handle<HeapObject>::hash {};
+
+template <>
+struct OpEqualTo<Handle<String>> : public Handle<String>::equal_to {};
+template <>
+struct OpHash<Handle<String>> : public Handle<String>::hash {};
+
+template <>
+struct OpEqualTo<Handle<ScopeInfo>> : public Handle<ScopeInfo>::equal_to {};
+template <>
+struct OpHash<Handle<ScopeInfo>> : public Handle<ScopeInfo>::hash {};
 
 }  // namespace compiler
 }  // namespace internal
