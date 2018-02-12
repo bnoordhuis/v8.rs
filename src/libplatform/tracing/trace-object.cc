@@ -4,10 +4,10 @@
 
 #include "include/libplatform/v8-tracing.h"
 
-#include "base/trace_event/common/trace_event_common.h"
 #include "include/v8-platform.h"
 #include "src/base/platform/platform.h"
 #include "src/base/platform/time.h"
+#include "src/tracing/trace-event.h"
 
 namespace v8 {
 namespace platform {

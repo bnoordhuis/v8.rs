@@ -26,18 +26,6 @@ class AsyncFunctionBuiltinsAssembler : public AsyncBuiltinsAssembler {
       JSGeneratorObject::ResumeMode resume_mode);
 };
 
-namespace {
-
-// Describe fields of Context associated with AsyncFunctionAwait resume
-// closures.
-// TODO(jgruber): Refactor to reuse code for upcoming async-generators.
-class AwaitContext {
- public:
-  enum Fields { kGeneratorSlot = Context::MIN_CONTEXT_SLOTS, kLength };
-};
-
-}  // anonymous namespace
-
 void AsyncFunctionBuiltinsAssembler::AsyncFunctionAwaitResumeClosure(
     Node* context, Node* sent_value,
     JSGeneratorObject::ResumeMode resume_mode) {

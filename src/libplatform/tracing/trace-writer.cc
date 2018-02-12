@@ -6,9 +6,9 @@
 
 #include <cmath>
 
-#include "base/trace_event/common/trace_event_common.h"
 #include "include/v8-platform.h"
 #include "src/base/platform/platform.h"
+#include "src/tracing/trace-event.h"
 
 namespace v8 {
 namespace platform {

@@ -16,13 +16,6 @@ using compiler::Node;
 
 namespace {
 
-// Describe fields of Context associated with AsyncGeneratorAwait resume
-// closures.
-class AwaitContext {
- public:
-  enum Fields { kGeneratorSlot = Context::MIN_CONTEXT_SLOTS, kLength };
-};
-
 class AsyncGeneratorBuiltinsAssembler : public AsyncBuiltinsAssembler {
  public:
   explicit AsyncGeneratorBuiltinsAssembler(CodeAssemblerState* state)

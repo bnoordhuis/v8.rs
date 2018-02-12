@@ -10,6 +10,13 @@
 namespace v8 {
 namespace internal {
 
+// Describe fields of Context associated with AsyncFunctionAwait and
+// AsyncGeneratorAwait resume closures.
+class AwaitContext {
+ public:
+  enum Fields { kGeneratorSlot = Context::MIN_CONTEXT_SLOTS, kLength };
+};
+
 class AsyncBuiltinsAssembler : public PromiseBuiltinsAssembler {
  public:
   explicit AsyncBuiltinsAssembler(compiler::CodeAssemblerState* state)

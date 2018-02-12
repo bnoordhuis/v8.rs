@@ -2446,11 +2446,6 @@ VISIT_ATOMIC_BINOP(Xor)
   V(I16x8)            \
   V(I8x16)
 
-#define SIMD_FORMAT_LIST(V) \
-  V(32x4)                   \
-  V(16x8)                   \
-  V(8x16)
-
 #define SIMD_BINOP_LIST(V) \
   V(I32x4Add)              \
   V(I32x4AddHoriz)         \
