@@ -1,27 +1,667 @@
-ARCH := $(word 1, $(subst -, ,$(TARGET)))
+.SUFFIXES:
 
-V8_FLAGS := OUTDIR="$(OUT_DIR)" library=shared i18nsupport=off
+PYTHON ?= python
+
+arch := $(word 1, $(subst -, ,$(TARGET)))
+os := $(word 3, $(subst -, ,$(TARGET)))
+
+ifeq (aarch64,$(arch))
+CXXFLAGS += -DV8_TARGET_ARCH_ARM64
+arch := arm64
+endif
+ifeq (arm,$(arch))
+CXXFLAGS += -DV8_TARGET_ARCH_ARM
+endif
+ifeq (i686,$(arch))
+CXXFLAGS += -DV8_TARGET_ARCH_IA32
+arch := ia32
+endif
+ifeq (mips,$(arch))
+CXXFLAGS += -DV8_TARGET_ARCH_MIPS
+endif
+ifeq (mipsel,$(arch))
+CXXFLAGS += -DV8_TARGET_ARCH_MIPS
+arch := mips
+endif
+ifeq (powerpc,$(arch))
+CXXFLAGS += -DV8_TARGET_ARCH_PPC
+arch := ppc
+endif
+ifeq (powerpc64,$(arch))
+CXXFLAGS += -DV8_TARGET_ARCH_PPC64
+arch := ppc64
+endif
+ifeq (powerpc64le,$(arch))
+CXXFLAGS += -DV8_TARGET_ARCH_PPC64
+arch := ppc64
+endif
+ifeq (x86_64,$(arch))
+CXXFLAGS += -DV8_TARGET_ARCH_X64
+arch := x64
+endif
+
+ifeq (darwin,$(os))
+os := macos
+endif
+ifeq (windows,$(os))
+os := win32
+endif
+
+CXXFLAGS += -I. -Iinclude -fPIC -pthread
+CXXFLAGS += -DENABLE_DISASSEMBLER
+CXXFLAGS += -DOBJECT_PRINT
+CXXFLAGS += -DV8_CONCURRENT_MARKING
+CXXFLAGS += -DV8_TYPED_ARRAY_MAX_SIZE_IN_HEAP=0
 
 ifeq (true,$(DEBUG))
-V8_FLAGS := $(V8_FLAGS) extrachecks=on
-V8_MODE := debug
+CXXFLAGS += -O0
+CXXFLAGS += -DDEBUG
+CXXFLAGS += -DENABLE_SLOW_DCHECKS
+CXXFLAGS += -DV8_ENABLE_CHECKS
+CXXFLAGS += -DV8_TRACE_MAPS
+CXXFLAGS += -DVERIFY_HEAP
 else
-V8_MODE := release
+CXXFLAGS += -O2
 endif
 
-ifeq (i686,$(ARCH))
-V8_ARCH := ia32
+ifeq (false,$(snapshot))
+sources += src/snapshot/snapshot-empty.cc
+else
+CXXFLAGS += -DV8_USE_SNAPSHOT
+libs += $(OUT_DIR)/libv8_snapshot.so
 endif
 
-ifeq (x86_64,$(ARCH))
-V8_ARCH := x64
+libs += $(OUT_DIR)/libv8.so
+
+sources += $(OUT_DIR)/libraries.cc
+sources += src/$(arch)/assembler-$(arch).cc
+sources += src/$(arch)/code-stubs-$(arch).cc
+sources += src/$(arch)/codegen-$(arch).cc
+sources += src/$(arch)/cpu-$(arch).cc
+sources += src/$(arch)/deoptimizer-$(arch).cc
+sources += src/$(arch)/disasm-$(arch).cc
+sources += src/$(arch)/eh-frame-$(arch).cc
+sources += src/$(arch)/frame-constants-$(arch).cc
+sources += src/$(arch)/interface-descriptors-$(arch).cc
+sources += src/$(arch)/macro-assembler-$(arch).cc
+sources += src/$(arch)/simulator-$(arch).cc
+sources += src/accessors.cc
+sources += src/address-map.cc
+sources += src/allocation.cc
+sources += src/api-arguments.cc
+sources += src/api-natives.cc
+sources += src/api.cc
+sources += src/arguments.cc
+sources += src/asmjs/asm-js.cc
+sources += src/asmjs/asm-parser.cc
+sources += src/asmjs/asm-scanner.cc
+sources += src/asmjs/asm-types.cc
+sources += src/asmjs/switch-logic.cc
+sources += src/assembler.cc
+sources += src/assert-scope.cc
+sources += src/ast/ast-function-literal-id-reindexer.cc
+sources += src/ast/ast-numbering.cc
+sources += src/ast/ast-value-factory.cc
+sources += src/ast/ast.cc
+sources += src/ast/compile-time-value.cc
+sources += src/ast/context-slot-cache.cc
+sources += src/ast/modules.cc
+sources += src/ast/prettyprinter.cc
+sources += src/ast/scopes.cc
+sources += src/ast/variables.cc
+sources += src/bailout-reason.cc
+sources += src/base/bits.cc
+sources += src/base/cpu.cc
+sources += src/base/debug/stack_trace.cc
+sources += src/base/division-by-constant.cc
+sources += src/base/file-utils.cc
+sources += src/base/functional.cc
+sources += src/base/ieee754.cc
+sources += src/base/logging.cc
+sources += src/base/once.cc
+sources += src/base/platform/condition-variable.cc
+sources += src/base/platform/mutex.cc
+sources += src/base/platform/platform-$(os).cc
+sources += src/base/platform/semaphore.cc
+sources += src/base/platform/time.cc
+sources += src/base/sys-info.cc
+sources += src/base/utils/random-number-generator.cc
+sources += src/basic-block-profiler.cc
+sources += src/bignum-dtoa.cc
+sources += src/bignum.cc
+sources += src/bit-vector.cc
+sources += src/bootstrapper.cc
+sources += src/builtins/builtins-api.cc
+sources += src/builtins/builtins-array.cc
+sources += src/builtins/builtins-arraybuffer.cc
+sources += src/builtins/builtins-bigint.cc
+sources += src/builtins/builtins-boolean.cc
+sources += src/builtins/builtins-call.cc
+sources += src/builtins/builtins-callsite.cc
+sources += src/builtins/builtins-collections.cc
+sources += src/builtins/builtins-console.cc
+sources += src/builtins/builtins-dataview.cc
+sources += src/builtins/builtins-date.cc
+sources += src/builtins/builtins-error.cc
+sources += src/builtins/builtins-function.cc
+sources += src/builtins/builtins-global.cc
+sources += src/builtins/builtins-internal.cc
+sources += src/builtins/builtins-interpreter.cc
+sources += src/builtins/builtins-json.cc
+sources += src/builtins/builtins-math.cc
+sources += src/builtins/builtins-number.cc
+sources += src/builtins/builtins-object.cc
+sources += src/builtins/builtins-promise.cc
+sources += src/builtins/builtins-reflect.cc
+sources += src/builtins/builtins-regexp.cc
+sources += src/builtins/builtins-sharedarraybuffer.cc
+sources += src/builtins/builtins-string.cc
+sources += src/builtins/builtins-symbol.cc
+sources += src/builtins/builtins-typedarray.cc
+sources += src/builtins/builtins.cc
+sources += src/cached-powers.cc
+sources += src/cancelable-task.cc
+sources += src/code-factory.cc
+sources += src/code-stub-assembler.cc
+sources += src/code-stubs.cc
+sources += src/codegen.cc
+sources += src/compilation-cache.cc
+sources += src/compilation-dependencies.cc
+sources += src/compilation-info.cc
+sources += src/compilation-statistics.cc
+sources += src/compiler-dispatcher/compiler-dispatcher-job.cc
+sources += src/compiler-dispatcher/compiler-dispatcher-tracer.cc
+sources += src/compiler-dispatcher/compiler-dispatcher.cc
+sources += src/compiler-dispatcher/optimizing-compile-dispatcher.cc
+sources += src/compiler-dispatcher/unoptimized-compile-job.cc
+sources += src/compiler.cc
+sources += src/compiler/$(arch)/code-generator-$(arch).cc
+sources += src/compiler/$(arch)/instruction-scheduler-$(arch).cc
+sources += src/compiler/$(arch)/instruction-selector-$(arch).cc
+sources += src/compiler/$(arch)/unwinding-info-writer-$(arch).cc
+sources += src/compiler/access-builder.cc
+sources += src/compiler/access-info.cc
+sources += src/compiler/all-nodes.cc
+sources += src/compiler/basic-block-instrumentor.cc
+sources += src/compiler/branch-elimination.cc
+sources += src/compiler/bytecode-analysis.cc
+sources += src/compiler/bytecode-graph-builder.cc
+sources += src/compiler/bytecode-liveness-map.cc
+sources += src/compiler/c-linkage.cc
+sources += src/compiler/checkpoint-elimination.cc
+sources += src/compiler/code-assembler.cc
+sources += src/compiler/code-generator.cc
+sources += src/compiler/common-node-cache.cc
+sources += src/compiler/common-operator-reducer.cc
+sources += src/compiler/common-operator.cc
+sources += src/compiler/compiler-source-position-table.cc
+sources += src/compiler/control-equivalence.cc
+sources += src/compiler/control-flow-optimizer.cc
+sources += src/compiler/dead-code-elimination.cc
+sources += src/compiler/effect-control-linearizer.cc
+sources += src/compiler/escape-analysis-reducer.cc
+sources += src/compiler/escape-analysis.cc
+sources += src/compiler/frame-elider.cc
+sources += src/compiler/frame-states.cc
+sources += src/compiler/frame.cc
+sources += src/compiler/gap-resolver.cc
+sources += src/compiler/graph-assembler.cc
+sources += src/compiler/graph-reducer.cc
+sources += src/compiler/graph-trimmer.cc
+sources += src/compiler/graph-visualizer.cc
+sources += src/compiler/graph.cc
+sources += src/compiler/instruction-scheduler.cc
+sources += src/compiler/instruction-selector.cc
+sources += src/compiler/instruction.cc
+sources += src/compiler/int64-lowering.cc
+sources += src/compiler/js-builtin-reducer.cc
+sources += src/compiler/js-call-reducer.cc
+sources += src/compiler/js-context-specialization.cc
+sources += src/compiler/js-create-lowering.cc
+sources += src/compiler/js-generic-lowering.cc
+sources += src/compiler/js-graph.cc
+sources += src/compiler/js-inlining-heuristic.cc
+sources += src/compiler/js-inlining.cc
+sources += src/compiler/js-intrinsic-lowering.cc
+sources += src/compiler/js-native-context-specialization.cc
+sources += src/compiler/js-operator.cc
+sources += src/compiler/js-type-hint-lowering.cc
+sources += src/compiler/js-typed-lowering.cc
+sources += src/compiler/jump-threading.cc
+sources += src/compiler/linkage.cc
+sources += src/compiler/live-range-separator.cc
+sources += src/compiler/load-elimination.cc
+sources += src/compiler/loop-analysis.cc
+sources += src/compiler/loop-peeling.cc
+sources += src/compiler/loop-variable-optimizer.cc
+sources += src/compiler/machine-graph-verifier.cc
+sources += src/compiler/machine-operator-reducer.cc
+sources += src/compiler/machine-operator.cc
+sources += src/compiler/memory-optimizer.cc
+sources += src/compiler/move-optimizer.cc
+sources += src/compiler/node-cache.cc
+sources += src/compiler/node-marker.cc
+sources += src/compiler/node-matchers.cc
+sources += src/compiler/node-properties.cc
+sources += src/compiler/node.cc
+sources += src/compiler/opcodes.cc
+sources += src/compiler/operation-typer.cc
+sources += src/compiler/operator-properties.cc
+sources += src/compiler/operator.cc
+sources += src/compiler/osr.cc
+sources += src/compiler/pipeline-statistics.cc
+sources += src/compiler/pipeline.cc
+sources += src/compiler/property-access-builder.cc
+sources += src/compiler/raw-machine-assembler.cc
+sources += src/compiler/redundancy-elimination.cc
+sources += src/compiler/register-allocator-verifier.cc
+sources += src/compiler/register-allocator.cc
+sources += src/compiler/representation-change.cc
+sources += src/compiler/schedule.cc
+sources += src/compiler/scheduler.cc
+sources += src/compiler/select-lowering.cc
+sources += src/compiler/simd-scalar-lowering.cc
+sources += src/compiler/simplified-lowering.cc
+sources += src/compiler/simplified-operator-reducer.cc
+sources += src/compiler/simplified-operator.cc
+sources += src/compiler/state-values-utils.cc
+sources += src/compiler/store-store-elimination.cc
+sources += src/compiler/type-cache.cc
+sources += src/compiler/typed-optimization.cc
+sources += src/compiler/typer.cc
+sources += src/compiler/types.cc
+sources += src/compiler/value-numbering-reducer.cc
+sources += src/compiler/verifier.cc
+sources += src/compiler/wasm-compiler.cc
+sources += src/compiler/wasm-linkage.cc
+sources += src/compiler/zone-stats.cc
+sources += src/contexts.cc
+sources += src/conversions.cc
+sources += src/counters.cc
+sources += src/date.cc
+sources += src/dateparser.cc
+sources += src/debug/$(arch)/debug-$(arch).cc
+sources += src/debug/debug-coverage.cc
+sources += src/debug/debug-evaluate.cc
+sources += src/debug/debug-frames.cc
+sources += src/debug/debug-scope-iterator.cc
+sources += src/debug/debug-scopes.cc
+sources += src/debug/debug-stack-trace-iterator.cc
+sources += src/debug/debug-type-profile.cc
+sources += src/debug/debug.cc
+sources += src/debug/liveedit.cc
+sources += src/deoptimize-reason.cc
+sources += src/deoptimizer.cc
+sources += src/disassembler.cc
+sources += src/diy-fp.cc
+sources += src/dtoa.cc
+sources += src/eh-frame.cc
+sources += src/elements-kind.cc
+sources += src/elements.cc
+sources += src/execution.cc
+sources += src/extensions/externalize-string-extension.cc
+sources += src/extensions/free-buffer-extension.cc
+sources += src/extensions/gc-extension.cc
+sources += src/extensions/ignition-statistics-extension.cc
+sources += src/extensions/statistics-extension.cc
+sources += src/extensions/trigger-failure-extension.cc
+sources += src/external-reference-table.cc
+sources += src/factory.cc
+sources += src/fast-dtoa.cc
+sources += src/feedback-vector.cc
+sources += src/field-type.cc
+sources += src/fixed-dtoa.cc
+sources += src/flags.cc
+sources += src/frames.cc
+sources += src/futex-emulation.cc
+sources += src/gdb-jit.cc
+sources += src/global-handles.cc
+sources += src/handles.cc
+sources += src/heap/array-buffer-collector.cc
+sources += src/heap/array-buffer-tracker.cc
+sources += src/heap/code-stats.cc
+sources += src/heap/concurrent-marking.cc
+sources += src/heap/embedder-tracing.cc
+sources += src/heap/gc-idle-time-handler.cc
+sources += src/heap/gc-tracer.cc
+sources += src/heap/heap.cc
+sources += src/heap/incremental-marking-job.cc
+sources += src/heap/incremental-marking.cc
+sources += src/heap/invalidated-slots.cc
+sources += src/heap/mark-compact.cc
+sources += src/heap/marking.cc
+sources += src/heap/memory-reducer.cc
+sources += src/heap/object-stats.cc
+sources += src/heap/objects-visiting.cc
+sources += src/heap/scavenge-job.cc
+sources += src/heap/scavenger.cc
+sources += src/heap/spaces.cc
+sources += src/heap/store-buffer.cc
+sources += src/heap/sweeper.cc
+sources += src/ic/call-optimization.cc
+sources += src/ic/handler-configuration.cc
+sources += src/ic/ic-stats.cc
+sources += src/ic/ic.cc
+sources += src/ic/stub-cache.cc
+sources += src/icu_util.cc
+sources += src/identity-map.cc
+sources += src/interface-descriptors.cc
+sources += src/interpreter/bytecode-array-accessor.cc
+sources += src/interpreter/bytecode-array-builder.cc
+sources += src/interpreter/bytecode-array-iterator.cc
+sources += src/interpreter/bytecode-array-random-iterator.cc
+sources += src/interpreter/bytecode-array-writer.cc
+sources += src/interpreter/bytecode-decoder.cc
+sources += src/interpreter/bytecode-flags.cc
+sources += src/interpreter/bytecode-generator.cc
+sources += src/interpreter/bytecode-label.cc
+sources += src/interpreter/bytecode-node.cc
+sources += src/interpreter/bytecode-operands.cc
+sources += src/interpreter/bytecode-register-optimizer.cc
+sources += src/interpreter/bytecode-register.cc
+sources += src/interpreter/bytecode-source-info.cc
+sources += src/interpreter/bytecodes.cc
+sources += src/interpreter/constant-array-builder.cc
+sources += src/interpreter/control-flow-builders.cc
+sources += src/interpreter/handler-table-builder.cc
+sources += src/interpreter/interpreter-intrinsics.cc
+sources += src/interpreter/interpreter.cc
+sources += src/isolate.cc
+sources += src/json-parser.cc
+sources += src/json-stringifier.cc
+sources += src/keys.cc
+sources += src/layout-descriptor.cc
+sources += src/libplatform/default-background-task-runner.cc
+sources += src/libplatform/default-foreground-task-runner.cc
+sources += src/libplatform/default-platform.cc
+sources += src/libplatform/task-queue.cc
+sources += src/libplatform/tracing/trace-buffer.cc
+sources += src/libplatform/tracing/trace-config.cc
+sources += src/libplatform/tracing/trace-object.cc
+sources += src/libplatform/tracing/trace-writer.cc
+sources += src/libplatform/tracing/tracing-controller.cc
+sources += src/libplatform/worker-thread.cc
+sources += src/libsampler/sampler.cc
+sources += src/log-utils.cc
+sources += src/log.cc
+sources += src/lookup-cache.cc
+sources += src/lookup.cc
+sources += src/machine-type.cc
+sources += src/map-updater.cc
+sources += src/messages.cc
+sources += src/objects-debug.cc
+sources += src/objects-printer.cc
+sources += src/objects.cc
+sources += src/objects/bigint.cc
+sources += src/objects/debug-objects.cc
+sources += src/objects/literal-objects.cc
+sources += src/objects/module.cc
+sources += src/objects/scope-info.cc
+sources += src/objects/template-objects.cc
+sources += src/ostreams.cc
+sources += src/parsing/background-parsing-task.cc
+sources += src/parsing/expression-scope-reparenter.cc
+sources += src/parsing/func-name-inferrer.cc
+sources += src/parsing/parse-info.cc
+sources += src/parsing/parser.cc
+sources += src/parsing/parsing.cc
+sources += src/parsing/pattern-rewriter.cc
+sources += src/parsing/preparse-data.cc
+sources += src/parsing/preparsed-scope-data.cc
+sources += src/parsing/preparser.cc
+sources += src/parsing/rewriter.cc
+sources += src/parsing/scanner-character-streams.cc
+sources += src/parsing/scanner.cc
+sources += src/parsing/token.cc
+sources += src/pending-compilation-error-handler.cc
+sources += src/perf-jit.cc
+sources += src/profiler/allocation-tracker.cc
+sources += src/profiler/cpu-profiler.cc
+sources += src/profiler/heap-profiler.cc
+sources += src/profiler/heap-snapshot-generator.cc
+sources += src/profiler/profile-generator.cc
+sources += src/profiler/profiler-listener.cc
+sources += src/profiler/sampling-heap-profiler.cc
+sources += src/profiler/strings-storage.cc
+sources += src/profiler/tick-sample.cc
+sources += src/profiler/tracing-cpu-profiler.cc
+sources += src/property-descriptor.cc
+sources += src/property.cc
+sources += src/regexp/$(arch)/regexp-macro-assembler-$(arch).cc
+sources += src/regexp/interpreter-irregexp.cc
+sources += src/regexp/jsregexp.cc
+sources += src/regexp/regexp-ast.cc
+sources += src/regexp/regexp-macro-assembler-irregexp.cc
+sources += src/regexp/regexp-macro-assembler-tracer.cc
+sources += src/regexp/regexp-macro-assembler.cc
+sources += src/regexp/regexp-parser.cc
+sources += src/regexp/regexp-stack.cc
+sources += src/regexp/regexp-utils.cc
+sources += src/register-configuration.cc
+sources += src/runtime-profiler.cc
+sources += src/runtime/runtime-array.cc
+sources += src/runtime/runtime-atomics.cc
+sources += src/runtime/runtime-bigint.cc
+sources += src/runtime/runtime-classes.cc
+sources += src/runtime/runtime-collections.cc
+sources += src/runtime/runtime-compiler.cc
+sources += src/runtime/runtime-date.cc
+sources += src/runtime/runtime-debug.cc
+sources += src/runtime/runtime-error.cc
+sources += src/runtime/runtime-forin.cc
+sources += src/runtime/runtime-function.cc
+sources += src/runtime/runtime-futex.cc
+sources += src/runtime/runtime-generator.cc
+sources += src/runtime/runtime-internal.cc
+sources += src/runtime/runtime-interpreter.cc
+sources += src/runtime/runtime-literals.cc
+sources += src/runtime/runtime-liveedit.cc
+sources += src/runtime/runtime-maths.cc
+sources += src/runtime/runtime-module.cc
+sources += src/runtime/runtime-numbers.cc
+sources += src/runtime/runtime-object.cc
+sources += src/runtime/runtime-operators.cc
+sources += src/runtime/runtime-promise.cc
+sources += src/runtime/runtime-proxy.cc
+sources += src/runtime/runtime-regexp.cc
+sources += src/runtime/runtime-scopes.cc
+sources += src/runtime/runtime-strings.cc
+sources += src/runtime/runtime-symbol.cc
+sources += src/runtime/runtime-test.cc
+sources += src/runtime/runtime-typedarray.cc
+sources += src/runtime/runtime-wasm.cc
+sources += src/runtime/runtime.cc
+sources += src/safepoint-table.cc
+sources += src/snapshot/builtin-deserializer-allocator.cc
+sources += src/snapshot/builtin-deserializer.cc
+sources += src/snapshot/builtin-serializer-allocator.cc
+sources += src/snapshot/builtin-serializer.cc
+sources += src/snapshot/builtin-snapshot-utils.cc
+sources += src/snapshot/code-serializer.cc
+sources += src/snapshot/default-deserializer-allocator.cc
+sources += src/snapshot/default-serializer-allocator.cc
+sources += src/snapshot/deserializer.cc
+sources += src/snapshot/natives-common.cc
+sources += src/snapshot/object-deserializer.cc
+sources += src/snapshot/partial-deserializer.cc
+sources += src/snapshot/partial-serializer.cc
+sources += src/snapshot/serializer-common.cc
+sources += src/snapshot/serializer.cc
+sources += src/snapshot/snapshot-common.cc
+sources += src/snapshot/snapshot-source-sink.cc
+sources += src/snapshot/startup-deserializer.cc
+sources += src/snapshot/startup-serializer.cc
+sources += src/source-position-table.cc
+sources += src/source-position.cc
+sources += src/startup-data-util.cc
+sources += src/string-builder.cc
+sources += src/string-case.cc
+sources += src/string-stream.cc
+sources += src/strtod.cc
+sources += src/tracing/trace-event.cc
+sources += src/tracing/traced-value.cc
+sources += src/tracing/tracing-category-observer.cc
+sources += src/transitions.cc
+sources += src/trap-handler/handler-outside.cc
+sources += src/trap-handler/handler-shared.cc
+sources += src/type-hints.cc
+sources += src/unicode-decoder.cc
+sources += src/unicode.cc
+sources += src/uri.cc
+sources += src/utils.cc
+sources += src/v8.cc
+sources += src/v8threads.cc
+sources += src/value-serializer.cc
+sources += src/version.cc
+sources += src/visitors.cc
+sources += src/wasm/baseline/liftoff-assembler.cc
+sources += src/wasm/baseline/liftoff-compiler.cc
+sources += src/wasm/compilation-manager.cc
+sources += src/wasm/function-body-decoder.cc
+sources += src/wasm/local-decl-encoder.cc
+sources += src/wasm/memory-tracing.cc
+sources += src/wasm/module-compiler.cc
+sources += src/wasm/module-decoder.cc
+sources += src/wasm/signature-map.cc
+sources += src/wasm/streaming-decoder.cc
+sources += src/wasm/wasm-api.cc
+sources += src/wasm/wasm-code-specialization.cc
+sources += src/wasm/wasm-code-wrapper.cc
+sources += src/wasm/wasm-debug.cc
+sources += src/wasm/wasm-external-refs.cc
+sources += src/wasm/wasm-heap.cc
+sources += src/wasm/wasm-interpreter.cc
+sources += src/wasm/wasm-js.cc
+sources += src/wasm/wasm-memory.cc
+sources += src/wasm/wasm-module-builder.cc
+sources += src/wasm/wasm-module.cc
+sources += src/wasm/wasm-objects.cc
+sources += src/wasm/wasm-opcodes.cc
+sources += src/wasm/wasm-result.cc
+sources += src/wasm/wasm-serialization.cc
+sources += src/wasm/wasm-text.cc
+sources += src/zone/accounting-allocator.cc
+sources += src/zone/zone-segment.cc
+sources += src/zone/zone-segment.cc
+sources += src/zone/zone.cc
+
+ifeq (linux,$(os))
+ifeq (x64,$(arch))
+sources += src/trap-handler/handler-inside.cc
+endif
 endif
 
-V8_TARGET := $(V8_ARCH).$(V8_MODE)
+ifeq (win32,$(os))
+sources += src/base/debug/stack_trace_win.cc
+else
+sources += src/base/platform/platform-posix-time.cc
+sources += src/base/platform/platform-posix.cc
+ifeq (android,$(os))
+sources += src/base/debug/stack_trace_android.cc
+else
+sources += src/base/debug/stack_trace_posix.cc
+endif
+endif
+
+gensources += src/builtins/$(arch)/builtins-$(arch).cc
+gensources += src/builtins/builtins-arguments-gen.cc
+gensources += src/builtins/builtins-array-gen.cc
+gensources += src/builtins/builtins-async-function-gen.cc
+gensources += src/builtins/builtins-async-gen.cc
+gensources += src/builtins/builtins-async-generator-gen.cc
+gensources += src/builtins/builtins-async-iterator-gen.cc
+gensources += src/builtins/builtins-boolean-gen.cc
+gensources += src/builtins/builtins-call-gen.cc
+gensources += src/builtins/builtins-collections-gen.cc
+gensources += src/builtins/builtins-console-gen.cc
+gensources += src/builtins/builtins-constructor-gen.cc
+gensources += src/builtins/builtins-conversion-gen.cc
+gensources += src/builtins/builtins-date-gen.cc
+gensources += src/builtins/builtins-debug-gen.cc
+gensources += src/builtins/builtins-function-gen.cc
+gensources += src/builtins/builtins-generator-gen.cc
+gensources += src/builtins/builtins-global-gen.cc
+gensources += src/builtins/builtins-handler-gen.cc
+gensources += src/builtins/builtins-ic-gen.cc
+gensources += src/builtins/builtins-internal-gen.cc
+gensources += src/builtins/builtins-interpreter-gen.cc
+gensources += src/builtins/builtins-iterator-gen.cc
+gensources += src/builtins/builtins-math-gen.cc
+gensources += src/builtins/builtins-number-gen.cc
+gensources += src/builtins/builtins-object-gen.cc
+gensources += src/builtins/builtins-promise-gen.cc
+gensources += src/builtins/builtins-proxy-gen.cc
+gensources += src/builtins/builtins-reflect-gen.cc
+gensources += src/builtins/builtins-regexp-gen.cc
+gensources += src/builtins/builtins-sharedarraybuffer-gen.cc
+gensources += src/builtins/builtins-string-gen.cc
+gensources += src/builtins/builtins-symbol-gen.cc
+gensources += src/builtins/builtins-typedarray-gen.cc
+gensources += src/builtins/builtins-wasm-gen.cc
+gensources += src/builtins/setup-builtins-internal.cc
+gensources += src/heap/setup-heap-internal.cc
+gensources += src/ic/accessor-assembler.cc
+gensources += src/ic/binary-op-assembler.cc
+gensources += src/ic/keyed-store-generic.cc
+gensources += src/interpreter/interpreter-assembler.cc
+gensources += src/interpreter/interpreter-generator.cc
+gensources += src/interpreter/interpreter-intrinsics-generator.cc
+gensources += src/interpreter/setup-interpreter-internal.cc
+gensources += src/setup-isolate-full.cc
+gensources += src/snapshot/mksnapshot.cc
+gensources += src/snapshot/snapshot-empty.cc
+
+# Order matters.
+jssources += src/js/macros.py
+jssources += src/messages.h
+jssources += src/js/prologue.js
+jssources += src/js/v8natives.js
+jssources += src/js/array.js
+jssources += src/js/typedarray.js
+jssources += src/js/messages.js
+jssources += src/js/spread.js
+jssources += src/js/proxy.js
+jssources += src/debug/mirrors.js
+jssources += src/debug/debug.js
+jssources += src/debug/liveedit.js
 
 .PHONY: all
-all: $(OUT_DIR)/libv8.so
+all: $(libs)
 
-$(OUT_DIR)/libv8.so:
-	$(MAKE) -f makefile.v8 -j $(NUM_JOBS) $(V8_TARGET) $(V8_FLAGS)
-	ln -fs $(OUT_DIR)/$(V8_TARGET)/lib.target/libv8.so $@
+$(OUT_DIR)/libv8.so:				\
+		$(OUT_DIR)/v8.cc		\
+		$(OUT_DIR)/extras-libraries.cc	\
+		$(OUT_DIR)/experimental-extras-libraries.cc
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(LDFLAGS)
+
+$(OUT_DIR)/libv8_snapshot.so:		\
+		$(OUT_DIR)/snapshot.cc	\
+		src/setup-isolate-deserialize.cc
+	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(LDFLAGS)
+
+$(OUT_DIR)/libv8_nosnapshot.so: src/snapshot/snapshot-empty.cc
+	$(CXX) $(CXXFLAGS) -shared -o $@ $< $(LDFLAGS)
+
+$(OUT_DIR)/snapshot.cc: $(OUT_DIR)/mksnapshot
+	$< --startup_src $@
+
+$(OUT_DIR)/mksnapshot: 				\
+		$(OUT_DIR)/mksnapshot.cc	\
+		$(OUT_DIR)/libv8.so		\
+		$(OUT_DIR)/libv8_nosnapshot.so
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) -Wl,-rpath,$(OUT_DIR)
+
+$(OUT_DIR)/v8.cc: $(sources)
+	cat $^ > $@
+
+$(OUT_DIR)/mksnapshot.cc: $(gensources)
+	cat $^ > $@
+
+$(OUT_DIR)/libraries.cc: tools/js2c.py $(jssources)
+	$(PYTHON) $< $@ CORE $(jssources)
+
+$(OUT_DIR)/extras-libraries.cc: tools/js2c.py
+	$(PYTHON) $< $@ EXTRAS # no sources
+
+$(OUT_DIR)/experimental-extras-libraries.cc: tools/js2c.py
+	$(PYTHON) $< $@ EXPERIMENTAL_EXTRAS # no sources

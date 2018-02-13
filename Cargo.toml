@@ -3,7 +3,8 @@
 name = "v8"
 version = "0.0.1"
 authors = ["Ben Noordhuis <info@bnoordhuis.nl>"]
-build = "make -f makefile.cargo"
+build = "build.rs"
+links = "v8"
 
 [lib]
 
